@@ -22,24 +22,28 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 네이버 증권사 사이트 실시간 밸류에이션(PER/ROE) 크롤링
+# 3. [보강 완료] 네이버 증권사 실시간 밸류에이션(PER/ROE) 우회 크롤링
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
         url = f"https://finance.naver.com/item/main.naver?code={ticker_code}"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
         res = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(res.text, 'html.parser')
 
         r_per = soup.select('#_per')
         if r_per: metrics["PER"] = f"{r_per[0].get_text(strip=True)}배"
 
-        table = soup.select('.section.cop_analysis table')
+        # ROE 파싱 로직 보강
+        table = soup.select('table.tb_type1_ifrs')
         if table:
             df_table = pd.read_html(str(table[0]))[0]
             for idx, row in df_table.iterrows():
                 if 'ROE' in str(row.values[0]):
-                    metrics["ROE"] = f"{row.values[3]}%"
+                    # 결측치가 아닌 가장 최근 결산 유효 데이터 추출
+                    valid_vals = [str(x) for x in row.values[1:] if str(x) != 'nan' and str(x).strip() != '-']
+                    if valid_vals:
+                        metrics["ROE"] = f"{valid_vals[-1]}%"
                     break
     except:
         pass
@@ -51,7 +55,7 @@ def get_classified_news(ticker_code, search_name=""):
     try:
         url = f"https://finance.naver.com/item/news_news.naver?code={ticker_code}&page=1"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': f"https://finance.naver.com/item/news.naver?code={ticker_code}"
         }
         res = requests.get(url, headers=headers, timeout=5)
@@ -80,10 +84,7 @@ def get_classified_news(ticker_code, search_name=""):
             raw_items.append({"제목": title_text, "언론사": source_text, "일자": date_text, "링크": href})
 
         filtered_items = [item for item in raw_items if search_name and (search_name in item['제목'])]
-        if len(filtered_items) < 3:
-            filtered_items = raw_items[:12]
-        else:
-            filtered_items = filtered_items[:12]
+        filtered_items = filtered_items[:12] if len(filtered_items) >= 3 else raw_items[:12]
 
         for item in filtered_items:
             if any(k in item['제목'] for k in pos_keywords): news_data["기회"].append(item)
@@ -127,7 +128,7 @@ def get_it_sin_youtube_insights():
             {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/@IT의신", "일자": "2026-07"}
         ]
 
-# 6. [수정 완료] 수급 랭킹 1~5위 빈칸 없는 스캐닝 엔진
+# 6. 수급 랭킹 1~5위 스캐닝 엔진
 @st.cache_data(ttl=300)
 def get_market_top_trades():
     pool = {
@@ -141,50 +142,33 @@ def get_market_top_trades():
     for name, symbol in pool.items():
         try:
             hist = yf.Ticker(symbol).history(period="10d")
+            # NaN 방어 보강
+            hist = hist.dropna(subset=['Close', 'Volume'])
             if hist.empty or len(hist) < 7: continue
+            
             recent = hist.tail(7)
             vol_sum = int(recent['Volume'].sum())
             price_chg = ((recent['Close'].iloc[-1] - recent['Close'].iloc[0]) / recent['Close'].iloc[0]) * 100
             
-            # 주가 거래량 가중 기반 계산
             f_vol = int(vol_sum * (0.25 if price_chg >= 0 else -0.22))
             i_vol = int(vol_sum * (0.20 if price_chg >= 0 else -0.18))
             
-            all_data.append({
-                "name": name,
-                "f_vol": f_vol,
-                "i_vol": i_vol,
-                "net_sum": f_vol + i_vol
-            })
+            all_data.append({"name": name, "f_vol": f_vol, "i_vol": i_vol, "net_sum": f_vol + i_vol})
         except: continue
 
     df_all = pd.DataFrame(all_data)
     
-    # 순매수 상위 5 (내림차순) / 순매도 상위 5 (오름차순)
-    df_buy = df_all.sort_values(by="net_sum", ascending=False).reset_index(drop=True).head(5)
-    df_sell = df_all.sort_values(by="net_sum", ascending=True).reset_index(drop=True).head(5)
+    df_buy = df_all.sort_values(by="net_sum", ascending=False).reset_index(drop=True).head(5) if not df_all.empty else pd.DataFrame()
+    df_sell = df_all.sort_values(by="net_sum", ascending=True).reset_index(drop=True).head(5) if not df_all.empty else pd.DataFrame()
 
-    b_list = []
+    b_list, s_list = [], []
     for i in range(len(df_buy)):
         r = df_buy.iloc[i]
-        b_list.append({
-            "순위": f"{i+1}위",
-            "외국인 매수 집중 종목": r["name"],
-            "외국인 순매수량": f"+{abs(r['f_vol']):,}주",
-            "기관 매수 집중 종목": r["name"],
-            "기관 순매수량": f"+{abs(r['i_vol']):,}주"
-        })
+        b_list.append({"순위": f"{i+1}위", "외국인 매수 집중 종목": r["name"], "외국인 순매수량": f"+{abs(r['f_vol']):,}주", "기관 매수 집중 종목": r["name"], "기관 순매수량": f"+{abs(r['i_vol']):,}주"})
 
-    s_list = []
     for i in range(len(df_sell)):
         r = df_sell.iloc[i]
-        s_list.append({
-            "순위": f"{i+1}위",
-            "외국인 매도 집중 종목": r["name"],
-            "외국인 순매도량": f"-{abs(r['f_vol']):,}주",
-            "기관 매도 집중 종목": r["name"],
-            "기관 순매도량": f"-{abs(r['i_vol']):,}주"
-        })
+        s_list.append({"순위": f"{i+1}위", "외국인 매도 집중 종목": r["name"], "외국인 순매도량": f"-{abs(r['f_vol']):,}주", "기관 매도 집중 종목": r["name"], "기관 순매도량": f"-{abs(r['i_vol']):,}주"})
 
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
@@ -208,8 +192,13 @@ def load_market_data(ticker_symbol):
 
 if ticker_code:
     df = load_market_data(ticker)
-    if df.empty:
-        st.error("🚨 글로벌 서버 동기화 지연입니다. 잠시 후 재시도 해주십시오.")
+    
+    # ★ [핵심 교정 지점] 주가 결측치(NaN) 완벽 제거 방어 로직 추가
+    if not df.empty:
+        df = df.dropna(subset=['Close'])
+
+    if df.empty or len(df) < 120:
+        st.error("🚨 글로벌 서버 동기화 지연 또는 차트 분석을 위한 데이터가 부족합니다. 잠시 후 재시도 해주십시오.")
     else:
         df['MA20'] = df['Close'].rolling(window=20).mean()
         df['MA60'] = df['Close'].rolling(window=60).mean()
@@ -220,9 +209,13 @@ if ticker_code:
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / (loss + 1e-10)
         df['RSI'] = 100 - (100 / (1 + rs))
+        
+        # NaN 제거 후 가장 마지막 행의 데이터를 안전하게 스칼라 값으로 추출
+        last_row = df.iloc[-1]
+        prev_row = df.iloc[-2]
 
-        current_price = float(df['Close'].iloc[-1])
-        prev_price = float(df['Close'].iloc[-2])
+        current_price = float(last_row['Close'])
+        prev_price = float(prev_row['Close'])
         pct_change = ((current_price - prev_price) / prev_price) * 100
 
         naver_metrics = get_naver_financial_metrics(ticker_code)
@@ -232,7 +225,11 @@ if ticker_code:
         m1.metric("현재가", f"{current_price:,.0f} KRW", f"{pct_change:+.2f}%")
         m2.metric("PER (네이버 실시간 연동)", naver_metrics["PER"])
         m3.metric("ROE (최근 결산치)", naver_metrics["ROE"])
-        m4.metric("RSI (14) 심리지표", f"{float(df['RSI'].iloc[-1]):.1f}")
+        
+        rsi_val = float(last_row['RSI'])
+        # RSI가 NaN일 경우 예외 처리
+        rsi_display = f"{rsi_val:.1f}" if pd.notna(rsi_val) else "분석 중"
+        m4.metric("RSI (14) 심리지표", rsi_display)
         st.markdown("---")
 
         # 실시간 이슈 분석
@@ -298,24 +295,27 @@ if ticker_code:
         # 퀀트 매수의견 및 트레이딩 전략
         st.markdown("### ⚡ 수석 애널리스트 퀀트 매수의견 및 종합 시그널")
         score = 0
-        ma120 = float(df['MA120'].iloc[-1])
-        ma20 = float(df['MA20'].iloc[-1])
-        ma60 = float(df['MA60'].iloc[-1])
-        rsi_val = float(df['RSI'].iloc[-1])
+        
+        # 이동평균선 안전 호출 (데이터가 부족해 NaN일 경우 0으로 강제 처리)
+        ma120 = float(last_row['MA120']) if pd.notna(last_row['MA120']) else 0
+        ma20 = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
+        ma60 = float(last_row['MA60']) if pd.notna(last_row['MA60']) else 0
 
-        if current_price > ma120: score += 25
-        if ma20 > ma60: score += 25
-        if rsi_val < 35: score += 25
-        elif 35 <= rsi_val <= 70: score += 15
+        if ma120 > 0 and current_price > ma120: score += 25
+        if ma60 > 0 and ma20 > ma60: score += 25
+        if pd.notna(rsi_val):
+            if rsi_val < 35: score += 25
+            elif 35 <= rsi_val <= 70: score += 15
         if len(classified_news["기회"]) > len(classified_news["위기"]): score += 25
 
         if score >= 75: st.success(f"🟢 **적극 매수 (Strong Buy)** | 스코어: **{score}점**")
         elif score >= 40: st.warning(f"🟡 **보유/관망 (Hold)** | 스코어: **{score}점**")
         else: st.error(f"🔴 **매수 금지 (Avoid)** | 스코어: **{score}점**")
 
-        # ★ [수정 지점] ValueError 완벽 해결: 단일 스칼라 값으로 비교 조건 처리
+        # ★ 20일선 안전성 검증 및 트레이딩 전략 (NaN 오류 완전 원천 차단)
         st.markdown("##### 🎯 수석 애널리스트 트레이딩 전략")
-        if ma20 < current_price:
+        
+        if ma20 > 0 and ma20 < current_price:
             buy_target = int(ma20)
         else:
             buy_target = int(current_price * 0.97)
@@ -331,6 +331,7 @@ if ticker_code:
         # 주가 기술적 분석 차트
         st.markdown("### 📈 주가 기술적 분석 차트 (20일선 · 60일선 · 120일 경기선)")
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.7, 0.3])
+        # 결측치(NaN)가 제거된 깔끔한 차트 데이터 출력
         fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="주가"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
