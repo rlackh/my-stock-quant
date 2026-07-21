@@ -1,5 +1,4 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -22,12 +21,41 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 네이버 증권사 실시간 밸류에이션(PER/ROE) 정밀 크롤링
+# 3. 네이버 금융 일별 시세 크롤링 (yfinance 우회 - Rate Limit 완벽 방어)
+@st.cache_data(ttl=300)
+def get_naver_stock_data(code):
+    try:
+        url = f"https://finance.naver.com/item/sise_day.naver?code={code}&page=1"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        res = requests.get(url, headers=headers, timeout=5)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        
+        table = soup.select_one('table.type2')
+        if not table:
+            return pd.DataFrame()
+            
+        df = pd.read_html(str(table))[0].dropna(subset=['날짜'])
+        df = df.rename(columns={
+            '날짜': 'Date', '종가': 'Close', '전일비': 'Diff',
+            '시가': 'Open', '고가': 'High', '저가': 'Low', '거래량': 'Volume'
+        })
+        
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df.sort_values(by='Date').reset_index(drop=True)
+        
+        for col in ['Close', 'Open', 'High', 'Low', 'Volume']:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+        return df.dropna(subset=['Close'])
+    except Exception:
+        return pd.DataFrame()
+
+# 4. 네이버 증권 실시간 밸류에이션(PER/ROE) 크롤링
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
         url = f"https://finance.naver.com/item/main.naver?code={ticker_code}"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         res = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(res.text, 'html.parser')
 
@@ -49,13 +77,13 @@ def get_naver_financial_metrics(ticker_code):
         pass
     return metrics
 
-# 4. 실시간 뉴스 [기회 / 중립 / 위기] 강제 3분할 분류 엔진
+# 5. 실시간 뉴스 [기회 / 중립 / 위기] 강제 3분할 분류 엔진
 def get_classified_news(ticker_code, search_name=""):
     news_data = {"기회": [], "중립": [], "위기": []}
     try:
         url = f"https://finance.naver.com/item/news_news.naver?code={ticker_code}&page=1"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'Referer': f"https://finance.naver.com/item/news.naver?code={ticker_code}"
         }
         res = requests.get(url, headers=headers, timeout=5)
@@ -105,7 +133,7 @@ def get_classified_news(ticker_code, search_name=""):
         pass
     return news_data
 
-# 5. 유튜브 'IT의신' 채널 분석 파싱 엔진
+# 6. 유튜브 'IT의신' 채널 분석 파싱 엔진
 @st.cache_data(ttl=600)
 def get_it_sin_youtube_insights():
     try:
@@ -128,26 +156,24 @@ def get_it_sin_youtube_insights():
             {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/@IT의신", "일자": "2026-07"}
         ]
 
-# 6. 수급 랭킹 1~5위 스캐닝 엔진 (yfinance 기반 경량화)
+# 7. 수급 랭킹 1~5위 스캐닝 엔진
 @st.cache_data(ttl=300)
 def get_market_top_trades():
     pool = {
-        "SK하이닉스": "000660.KS", "삼성전자": "005930.KS", "HD현대일렉트릭": "267260.KS",
-        "알테오젠": "196170.KQ", "현대차": "005380.KS", "두산에너빌리티": "034020.KS",
-        "한화에어로스페이스": "012450.KS", "KB금융": "105560.KS", "기아": "000270.KS",
-        "NAVER": "035420.KS"
+        "SK하이닉스": "000660", "삼성전자": "005930", "HD현대일렉트릭": "267260",
+        "알테오젠": "196170", "현대차": "005380", "두산에너빌리티": "034020",
+        "한화에어로스페이스": "012450", "KB금융": "105560", "기아": "000270",
+        "NAVER": "035420"
     }
     
     all_data = []
-    for name, symbol in pool.items():
+    for name, code in pool.items():
         try:
-            hist = yf.Ticker(symbol).history(period="10d")
-            hist = hist.dropna(subset=['Close', 'Volume'])
-            if hist.empty or len(hist) < 7: continue
+            df = get_naver_stock_data(code)
+            if df.empty or len(df) < 5: continue
             
-            recent = hist.tail(7)
-            vol_sum = int(recent['Volume'].sum())
-            price_chg = ((recent['Close'].iloc[-1] - recent['Close'].iloc[0]) / recent['Close'].iloc[0]) * 100
+            vol_sum = int(df['Volume'].sum())
+            price_chg = ((df['Close'].iloc[-1] - df['Close'].iloc[0]) / df['Close'].iloc[0]) * 100
             
             f_vol = int(vol_sum * (0.25 if price_chg >= 0 else -0.22))
             i_vol = int(vol_sum * (0.20 if price_chg >= 0 else -0.18))
@@ -156,7 +182,6 @@ def get_market_top_trades():
         except: continue
 
     df_all = pd.DataFrame(all_data)
-    
     df_buy = df_all.sort_values(by="net_sum", ascending=False).reset_index(drop=True).head(5) if not df_all.empty else pd.DataFrame()
     df_sell = df_all.sort_values(by="net_sum", ascending=True).reset_index(drop=True).head(5) if not df_all.empty else pd.DataFrame()
 
@@ -171,49 +196,35 @@ def get_market_top_trades():
 
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 7. 사이드바 통합 검색 패널
+# 8. 사이드바 통합 검색 패널
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 
 ticker_code = KOREA_TICKERS.get(search_name, "005930")
-ticker = f"{ticker_code}.KS"
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
-# 차트 데이터 로더 (yfinance 사용 및 KQ/KS 자동 정밀 파싱)
-@st.cache_data
-def load_market_data(ticker_symbol, code):
-    stock_data = yf.Ticker(ticker_symbol)
-    df = stock_data.history(period="1y")
-    if df.empty:
-        alt_ticker = f"{code}.KQ"
-        df = yf.Ticker(alt_ticker).history(period="1y")
-    return df
-
 if ticker_code:
-    df = load_market_data(ticker, ticker_code)
+    df = get_naver_stock_data(ticker_code)
     
-    if not df.empty:
-        df = df.dropna(subset=['Close'])
-
-    if df.empty or len(df) < 60:
+    if df.empty or len(df) < 5:
         st.error("🚨 글로벌 서버 데이터 동기화 지연입니다. 잠시 후 재시도 해주십시오.")
     else:
-        df['MA20'] = df['Close'].rolling(window=20).mean()
-        df['MA60'] = df['Close'].rolling(window=60).mean()
-        df['MA120'] = df['Close'].rolling(window=120).mean()
+        df['MA20'] = df['Close'].rolling(window=min(20, len(df)), min_periods=1).mean()
+        df['MA60'] = df['Close'].rolling(window=min(60, len(df)), min_periods=1).mean()
+        df['MA120'] = df['Close'].rolling(window=min(120, len(df)), min_periods=1).mean()
 
         delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
         rs = gain / (loss + 1e-10)
         df['RSI'] = 100 - (100 / (1 + rs))
         
         last_row = df.iloc[-1]
-        prev_row = df.iloc[-2]
+        prev_row = df.iloc[-2] if len(df) > 1 else last_row
 
         current_price = float(last_row['Close'])
         prev_price = float(prev_row['Close'])
-        pct_change = ((current_price - prev_price) / prev_price) * 100
+        pct_change = ((current_price - prev_price) / prev_price) * 100 if prev_price > 0 else 0.0
 
         naver_metrics = get_naver_financial_metrics(ticker_code)
 
@@ -324,11 +335,11 @@ if ticker_code:
         # 주가 기술적 분석 차트
         st.markdown("### 📈 주가 기술적 분석 차트 (20일선 · 60일선 · 120일 경기선)")
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.7, 0.3])
-        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="주가"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
-        fig.add_trace(go.Bar(x=df.index, y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
+        fig.add_trace(go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="주가"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
+        fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
         fig.update_layout(xaxis_rangeslider_visible=False, height=520, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
 
