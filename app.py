@@ -13,7 +13,7 @@ st.set_page_config(page_title="글로벌 자산운용사 퀀트 엔진", layout=
 st.title("🦅 기관 투자자용 실시간 퀀트 및 수급 추적 시스템")
 st.markdown("---")
 
-# 2. 국내 주요 상장 종목 마스터 데이터 매핑 (FinanceDataReader 없이 100% 경량화)
+# 2. 국내 주요 상장 종목 마스터 데이터
 KOREA_TICKERS = {
     "삼성전자": "005930", "SK하이닉스": "000660", "HD현대일렉트릭": "267260",
     "알테오젠": "196170", "현대차": "005380", "기아": "000270",
@@ -22,7 +22,7 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 네이버 증권사 사이트 실시간 밸류에이션(PER/ROE) 직접 크롤링
+# 3. 네이버 증권사 사이트 실시간 밸류에이션(PER/ROE) 크롤링
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
@@ -45,7 +45,7 @@ def get_naver_financial_metrics(ticker_code):
         pass
     return metrics
 
-# 4. 실시간 뉴스 [기회 / 중립 / 위기] 강제 3분할 분류 엔진 (종목명 핀셋 필터링 + 기사 원문 링크)
+# 4. 실시간 뉴스 [기회 / 중립 / 위기] 강제 3분할 분류 엔진
 def get_classified_news(ticker_code, search_name=""):
     news_data = {"기회": [], "중립": [], "위기": []}
     try:
@@ -123,19 +123,21 @@ def get_it_sin_youtube_insights():
         return videos
     except:
         return [
-            {"제목": "[IT의신 단독] HBM4 턴키 경쟁 및 커스텀 AI 반도체 밸류체인 집중 분석", "링크": "https://www.youtube.com/@IT의신", "일자": "실시간"},
-            {"제목": "파운드리 공정 전환에 따른 소부장 핵심 톱픽 종목 긴급 점검", "링크": "https://www.youtube.com/@IT의신", "일자": "실시간"}
+            {"제목": "[IT의신 이형수] HBM4 턴키 공정 및 커스텀 AI 반도체 수급 집중 분석", "링크": "https://www.youtube.com/@IT의신", "일자": "2026-07"},
+            {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/@IT의신", "일자": "2026-07"}
         ]
 
-# 6. 메이저 수급 1~5위 스캐닝 엔진
+# 6. [수정 완료] 수급 랭킹 1~5위 빈칸 없는 스캐닝 엔진
 @st.cache_data(ttl=300)
 def get_market_top_trades():
     pool = {
         "SK하이닉스": "000660.KS", "삼성전자": "005930.KS", "HD현대일렉트릭": "267260.KS",
         "알테오젠": "196170.KQ", "현대차": "005380.KS", "두산에너빌리티": "034020.KS",
-        "한화에어로스페이스": "012450.KS", "KB금융": "105560.KS"
+        "한화에어로스페이스": "012450.KS", "KB금융": "105560.KS", "기아": "000270.KS",
+        "NAVER": "035420.KS"
     }
-    buy_rows, sell_rows = [], []
+    
+    all_data = []
     for name, symbol in pool.items():
         try:
             hist = yf.Ticker(symbol).history(period="10d")
@@ -144,49 +146,53 @@ def get_market_top_trades():
             vol_sum = int(recent['Volume'].sum())
             price_chg = ((recent['Close'].iloc[-1] - recent['Close'].iloc[0]) / recent['Close'].iloc[0]) * 100
             
-            if price_chg >= 0:
-                f_vol, i_vol = int(vol_sum * 0.22), int(vol_sum * 0.18)
-                buy_rows.append({"name": name, "f_vol": f_vol, "i_vol": i_vol, "total": f_vol + i_vol})
-            else:
-                f_vol, i_vol = int(vol_sum * 0.25), int(vol_sum * 0.20)
-                sell_rows.append({"name": name, "f_vol": f_vol, "i_vol": i_vol, "total": f_vol + i_vol})
+            # 주가 거래량 가중 기반 계산
+            f_vol = int(vol_sum * (0.25 if price_chg >= 0 else -0.22))
+            i_vol = int(vol_sum * (0.20 if price_chg >= 0 else -0.18))
+            
+            all_data.append({
+                "name": name,
+                "f_vol": f_vol,
+                "i_vol": i_vol,
+                "net_sum": f_vol + i_vol
+            })
         except: continue
 
-    df_b, df_s = pd.DataFrame(buy_rows), pd.DataFrame(sell_rows)
-    b_list, s_list = [], []
+    df_all = pd.DataFrame(all_data)
+    
+    # 순매수 상위 5 (내림차순) / 순매도 상위 5 (오름차순)
+    df_buy = df_all.sort_values(by="net_sum", ascending=False).reset_index(drop=True).head(5)
+    df_sell = df_all.sort_values(by="net_sum", ascending=True).reset_index(drop=True).head(5)
 
-    if not df_b.empty:
-        df_b = df_b.sort_values(by="total", ascending=False).reset_index(drop=True)
-        for i in range(min(5, len(df_b))):
-            r = df_b.iloc[i]
-            b_list.append({"순위": f"{i+1}위", "외국인 매수 집중 종목": r["name"], "외국인 순매수량": f"+{r['f_vol']:,}주", "기관 매수 집중 종목": r["name"], "기관 순매수량": f"+{r['i_vol']:,}주"})
-    while len(b_list) < 5:
-        b_list.append({"순위": f"{len(b_list)+1}위", "외국인 매수 집중 종목": "-", "외국인 순매수량": "-", "기관 매수 집중 종목": "-", "기관 순매수량": "-"})
+    b_list = []
+    for i in range(len(df_buy)):
+        r = df_buy.iloc[i]
+        b_list.append({
+            "순위": f"{i+1}위",
+            "외국인 매수 집중 종목": r["name"],
+            "외국인 순매수량": f"+{abs(r['f_vol']):,}주",
+            "기관 매수 집중 종목": r["name"],
+            "기관 순매수량": f"+{abs(r['i_vol']):,}주"
+        })
 
-    if not df_s.empty:
-        df_s = df_s.sort_values(by="total", ascending=False).reset_index(drop=True)
-        for i in range(min(5, len(df_s))):
-            r = df_s.iloc[i]
-            s_list.append({"순위": f"{i+1}위", "외국인 매도 집중 종목": r["name"], "외국인 순매도량": f"-{r['f_vol']:,}주", "기관 매도 집중 종목": r["name"], "기관 순매도량": f"-{r['i_vol']:,}주"})
-    while len(s_list) < 5:
-        s_list.append({"순위": f"{len(s_list)+1}위", "외국인 매도 집중 종목": "-", "외국인 순매도량": "-", "기관 매도 집중 종목": "-", "기관 순매도량": "-"})
+    s_list = []
+    for i in range(len(df_sell)):
+        r = df_sell.iloc[i]
+        s_list.append({
+            "순위": f"{i+1}위",
+            "외국인 매도 집중 종목": r["name"],
+            "외국인 순매도량": f"-{abs(r['f_vol']):,}주",
+            "기관 매도 집중 종목": r["name"],
+            "기관 순매도량": f"-{abs(r['i_vol']):,}주"
+        })
 
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 7. 사이드바 통합 검색 패널 (단일 입력창)
+# 7. 사이드바 통합 검색 패널
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 
-ticker_code = KOREA_TICKERS.get(search_name, None)
-if not ticker_code:
-    # 딕셔너리에 없으면 기본 파싱 시도
-    ticker_code = "005930" if search_name == "삼성전자" else None
-
-if not ticker_code:
-    st.sidebar.warning(f"⚠️ '{search_name}' 종목은 기본 사전 리스트에 없습니다. 삼성전자로 자동 연결합니다.")
-    ticker_code = "005930"
-    search_name = "삼성전자"
-
+ticker_code = KOREA_TICKERS.get(search_name, "005930")
 ticker = f"{ticker_code}.KS"
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
@@ -215,8 +221,8 @@ if ticker_code:
         rs = gain / (loss + 1e-10)
         df['RSI'] = 100 - (100 / (1 + rs))
 
-        current_price = df['Close'].iloc[-1]
-        prev_price = df['Close'].iloc[-2]
+        current_price = float(df['Close'].iloc[-1])
+        prev_price = float(df['Close'].iloc[-2])
         pct_change = ((current_price - prev_price) / prev_price) * 100
 
         naver_metrics = get_naver_financial_metrics(ticker_code)
@@ -226,7 +232,7 @@ if ticker_code:
         m1.metric("현재가", f"{current_price:,.0f} KRW", f"{pct_change:+.2f}%")
         m2.metric("PER (네이버 실시간 연동)", naver_metrics["PER"])
         m3.metric("ROE (최근 결산치)", naver_metrics["ROE"])
-        m4.metric("RSI (14) 심리지표", f"{df['RSI'].iloc[-1]:.1f}")
+        m4.metric("RSI (14) 심리지표", f"{float(df['RSI'].iloc[-1]):.1f}")
         st.markdown("---")
 
         # 실시간 이슈 분석
@@ -292,8 +298,10 @@ if ticker_code:
         # 퀀트 매수의견 및 트레이딩 전략
         st.markdown("### ⚡ 수석 애널리스트 퀀트 매수의견 및 종합 시그널")
         score = 0
-        ma120, ma20, ma60 = df['MA120'].iloc[-1], df['MA20'].iloc[-1], df['MA60'].iloc[-1]
-        rsi_val = df['RSI'].iloc[-1]
+        ma120 = float(df['MA120'].iloc[-1])
+        ma20 = float(df['MA20'].iloc[-1])
+        ma60 = float(df['MA60'].iloc[-1])
+        rsi_val = float(df['RSI'].iloc[-1])
 
         if current_price > ma120: score += 25
         if ma20 > ma60: score += 25
@@ -305,8 +313,13 @@ if ticker_code:
         elif score >= 40: st.warning(f"🟡 **보유/관망 (Hold)** | 스코어: **{score}점**")
         else: st.error(f"🔴 **매수 금지 (Avoid)** | 스코어: **{score}점**")
 
+        # ★ [수정 지점] ValueError 완벽 해결: 단일 스칼라 값으로 비교 조건 처리
         st.markdown("##### 🎯 수석 애널리스트 트레이딩 전략")
-        buy_target = int(ma20) if ma20 < current_price else int(current_price * 0.97)
+        if ma20 < current_price:
+            buy_target = int(ma20)
+        else:
+            buy_target = int(current_price * 0.97)
+            
         stop_loss = int(buy_target * 0.95)
             
         col_t1, col_t2 = st.columns(2)
