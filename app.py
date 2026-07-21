@@ -1,5 +1,4 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -7,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import datetime
 import xml.etree.ElementTree as ET
+import FinanceDataReader as fdr
 
 # 1. 글로벌 헤지펀드 스펙 대시보드 환경 및 레이아웃 정의
 st.set_page_config(page_title="글로벌 자산운용사 퀀트 엔진", layout="wide")
@@ -22,7 +22,7 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 네이버 증권사 실시간 밸류에이션(PER/ROE) 우회 크롤링
+# 3. [오류 해결] 네이버 증권사 실시간 밸류에이션(PER/ROE) 정밀 크롤링
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
@@ -31,15 +31,20 @@ def get_naver_financial_metrics(ticker_code):
         res = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(res.text, 'html.parser')
 
+        # PER 스캔
         r_per = soup.select('#_per')
         if r_per: metrics["PER"] = f"{r_per[0].get_text(strip=True)}배"
 
-        table = soup.select('table.tb_type1_ifrs')
+        # ROE 스캔 (Multi-Index 방어 스캐닝 로직)
+        table = soup.select_one('.cop_analysis table')
         if table:
-            df_table = pd.read_html(str(table[0]))[0]
-            for idx, row in df_table.iterrows():
-                if 'ROE' in str(row.values[0]):
-                    valid_vals = [str(x) for x in row.values[1:] if str(x) != 'nan' and str(x).strip() != '-']
+            df_table = pd.read_html(str(table))[0]
+            for idx in range(len(df_table)):
+                row_name = str(df_table.iloc[idx, 0])
+                if 'ROE' in row_name:
+                    # 빈값(nan, -)을 제외하고 가장 최근 유효 결산치 추출
+                    row_vals = df_table.iloc[idx, 1:].dropna().values
+                    valid_vals = [str(x) for x in row_vals if str(x).lower() not in ['nan', '-']]
                     if valid_vals:
                         metrics["ROE"] = f"{valid_vals[-1]}%"
                     break
@@ -126,20 +131,22 @@ def get_it_sin_youtube_insights():
             {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/@IT의신", "일자": "2026-07"}
         ]
 
-# 6. 수급 랭킹 1~5위 스캐닝 엔진
+# 6. [오류 해결] 수급 랭킹 1~5위 스캐닝 엔진 (한국거래소 데이터 연동)
 @st.cache_data(ttl=300)
 def get_market_top_trades():
     pool = {
-        "SK하이닉스": "000660.KS", "삼성전자": "005930.KS", "HD현대일렉트릭": "267260.KS",
-        "알테오젠": "196170.KQ", "현대차": "005380.KS", "두산에너빌리티": "034020.KS",
-        "한화에어로스페이스": "012450.KS", "KB금융": "105560.KS", "기아": "000270.KS",
-        "NAVER": "035420.KS"
+        "SK하이닉스": "000660", "삼성전자": "005930", "HD현대일렉트릭": "267260",
+        "알테오젠": "196170", "현대차": "005380", "두산에너빌리티": "034020",
+        "한화에어로스페이스": "012450", "KB금융": "105560", "기아": "000270",
+        "NAVER": "035420"
     }
     
     all_data = []
+    start_date = (datetime.datetime.now() - datetime.timedelta(days=15)).strftime('%Y-%m-%d')
+    
     for name, symbol in pool.items():
         try:
-            hist = yf.Ticker(symbol).history(period="10d")
+            hist = fdr.DataReader(symbol, start=start_date)
             hist = hist.dropna(subset=['Close', 'Volume'])
             if hist.empty or len(hist) < 7: continue
             
@@ -169,32 +176,28 @@ def get_market_top_trades():
 
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 7. 사이드바 통합 검색 패널 (단일 창 유지)
+# 7. 사이드바 통합 검색 패널
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 
 ticker_code = KOREA_TICKERS.get(search_name, "005930")
-ticker = f"{ticker_code}.KS"
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
+# ★ [오류 해결] 메인 차트 데이터 - 야후 파이낸스 제거, 한국거래소 공식 FDR 연동
 @st.cache_data
 def load_market_data(ticker_symbol):
-    stock_data = yf.Ticker(ticker_symbol)
-    df = stock_data.history(period="1y")
-    if df.empty and ticker_symbol.endswith('.KS'):
-        alternative_ticker = ticker_symbol.replace('.KS', '.KQ')
-        stock_data = yf.Ticker(alternative_ticker)
-        df = stock_data.history(period="1y")
+    start_date = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d')
+    df = fdr.DataReader(ticker_symbol, start=start_date)
     return df
 
 if ticker_code:
-    df = load_market_data(ticker)
+    df = load_market_data(ticker_code)
     
     if not df.empty:
         df = df.dropna(subset=['Close'])
 
     if df.empty or len(df) < 120:
-        st.error("🚨 글로벌 서버 동기화 지연 또는 차트 분석을 위한 데이터가 부족합니다. 잠시 후 재시도 해주십시오.")
+        st.error("🚨 데이터 동기화 지연 또는 차트 분석을 위한 거래일수(120일)가 부족합니다. 잠시 후 재시도 해주십시오.")
     else:
         df['MA20'] = df['Close'].rolling(window=20).mean()
         df['MA60'] = df['Close'].rolling(window=60).mean()
@@ -332,17 +335,15 @@ if ticker_code:
 
         st.markdown("---")
 
-        # ★ 12. 수석 애널리스트 AI 프롬프트 생성기 (사용자 원칙 및 변수 연동)
+        # 12. 수석 애널리스트 AI 프롬프트 생성기
         st.markdown("### 🤖 수석 애널리스트 AI 프롬프트 자동 생성기")
-        st.caption("※ 회원님께서 확립하신 '4대 작성 원칙'을 기본 베이스로 하여, 하단에 입력하신 변수들이 완벽하게 결합된 5대 리포트용 프롬프트를 즉시 생성합니다. 생성된 텍스트를 복사해 챗GPT나 제미나이에 활용하십시오.")
+        st.caption("※ 회원님께서 확립하신 '4대 작성 원칙'을 기본 베이스로 하여, 하단에 입력하신 변수들이 완벽하게 결합된 5대 리포트용 프롬프트를 즉시 생성합니다.")
 
-        # 사용자 맞춤형 변수 입력 공간 (단일 검색창의 간결함 유지를 위해 프롬프트 전용 영역에 배치)
         col_p1, col_p2, col_p3 = st.columns(3)
         compare_name = col_p1.text_input("📊 비교 종목", "SK하이닉스")
         held_stock = col_p2.text_input("💼 보유 종목", "1Q S&P500")
         target_theme = col_p3.text_input("🚀 주도주 테마", "SMR (소형모듈원전)")
 
-        # 4대 절대 원칙 시스템 프롬프트
         master_prompt = """너는 20년 경력의 글로벌 자산운용사 수석 주식 애널리스트야. 아래 4가지 원칙을 반드시 지켜서 답해줘.
 1. 거대 자금을 운용해 온 전문가답게 신뢰감 있고 권위 있는 말투를 사용할 것
 2. 최근 6개월 이내의 데이터와 오늘 기준의 실시간 정보를 바탕으로 분석할 것
