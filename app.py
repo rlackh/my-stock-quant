@@ -21,11 +21,11 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 차단 0% 하이브리드 주가 데이터 수집 엔진
+# 3. 차단 0% 하이브리드 주가 데이터 수집 엔진 (★ 3개년, 800거래일로 대폭 확장)
 @st.cache_data(ttl=120)
 def get_korea_stock_data(code):
     try:
-        url = f"https://m.stock.naver.com/api/price/v2/count/120/code/{code}/day"
+        url = f"https://m.stock.naver.com/api/price/v2/count/800/code/{code}/day"
         headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X)'}
         res = requests.get(url, headers=headers, timeout=3)
         if res.status_code == 200:
@@ -45,7 +45,7 @@ def get_korea_stock_data(code):
         pass
 
     try:
-        url = f"https://finance.daum.net/api/quote/A{code}/days?page=1&perPage=120"
+        url = f"https://finance.daum.net/api/quote/A{code}/days?page=1&perPage=800"
         headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.daum.net'}
         res = requests.get(url, headers=headers, timeout=3)
         if res.status_code == 200:
@@ -171,13 +171,24 @@ def get_market_top_trades():
     all_data = []
     for name, code in pool.items():
         try:
-            df = get_korea_stock_data(code)
-            if df.empty or len(df) < 5: continue
-            vol_sum = int(df['Volume'].sum())
-            price_chg = ((df['Close'].iloc[-1] - df['Close'].iloc[0]) / df['Close'].iloc[0]) * 100
-            f_vol = int(vol_sum * (0.25 if price_chg >= 0 else -0.22))
-            i_vol = int(vol_sum * (0.20 if price_chg >= 0 else -0.18))
-            all_data.append({"name": name, "f_vol": f_vol, "i_vol": i_vol, "net_sum": f_vol + i_vol})
+            # 수급 분석용으로는 고속 파싱을 위해 120일치만 가져옴
+            url = f"https://m.stock.naver.com/api/price/v2/count/120/code/{code}/day"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            res = requests.get(url, headers=headers, timeout=3)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list) and len(data) >= 5:
+                    df = pd.DataFrame(data)
+                    df['closePrice'] = pd.to_numeric(df['closePrice'].astype(str).str.replace(',', ''), errors='coerce')
+                    df['accumulatedTradingVolume'] = pd.to_numeric(df['accumulatedTradingVolume'].astype(str).str.replace(',', ''), errors='coerce')
+                    
+                    recent = df.head(7)
+                    vol_sum = int(recent['accumulatedTradingVolume'].sum())
+                    price_chg = ((recent['closePrice'].iloc[0] - recent['closePrice'].iloc[-1]) / recent['closePrice'].iloc[-1]) * 100
+                    
+                    f_vol = int(vol_sum * (0.25 if price_chg >= 0 else -0.22))
+                    i_vol = int(vol_sum * (0.20 if price_chg >= 0 else -0.18))
+                    all_data.append({"name": name, "f_vol": f_vol, "i_vol": i_vol, "net_sum": f_vol + i_vol})
         except: continue
 
     df_all = pd.DataFrame(all_data)
@@ -353,13 +364,15 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 주가 기술적 분석 차트
-        st.markdown("### 📈 주가 기술적 분석 차트 (20일선 · 60일선 · 120일 경기선)")
+        # ★ [수정 완료] 주가 기술적 분석 차트 (최근 3개년 데이터 및 슬라이더 스와이프 기능 탑재)
+        st.markdown("### 📈 주가 기술적 분석 차트 (최근 3개년 장기 추세 및 거래량)")
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="주가"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
         fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
-        fig.update_layout(xaxis_rangeslider_visible=False, height=520, margin=dict(t=10, b=10, l=10, r=10))
+        
+        # 하단 미니맵(Rangeslider) 활성화로 3년 치 데이터를 직관적으로 탐색 가능하도록 적용
+        fig.update_layout(xaxis_rangeslider_visible=True, height=600, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
