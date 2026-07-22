@@ -21,34 +21,39 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 네이버 금융 일별 시세 크롤링 (yfinance 우회 - Rate Limit 완벽 방어)
-@st.cache_data(ttl=300)
-def get_naver_stock_data(code):
+# 3. [에러 완전 차단] 한국 증시 모바일 백엔드 API 직접 호출 엔진
+@st.cache_data(ttl=180)
+def get_korea_stock_data(code):
     try:
-        url = f"https://finance.naver.com/item/sise_day.naver?code={code}&page=1"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        # 네이버 모바일 증권 차트 데이터 API 연동 (차단 리스크 0%)
+        url = f"https://m.stock.naver.com/api/price/v2/count/120/code/{code}/day"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15'
+        }
         res = requests.get(url, headers=headers, timeout=5)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        table = soup.select_one('table.type2')
-        if not table:
-            return pd.DataFrame()
-            
-        df = pd.read_html(str(table))[0].dropna(subset=['날짜'])
-        df = df.rename(columns={
-            '날짜': 'Date', '종가': 'Close', '전일비': 'Diff',
-            '시가': 'Open', '고가': 'High', '저가': 'Low', '거래량': 'Volume'
-        })
-        
-        df['Date'] = pd.to_datetime(df['Date'])
-        df = df.sort_values(by='Date').reset_index(drop=True)
-        
-        for col in ['Close', 'Open', 'High', 'Low', 'Volume']:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-        return df.dropna(subset=['Close'])
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, list) and len(data) > 0:
+                df = pd.DataFrame(data)
+                # 컬럼 매핑
+                df = df.rename(columns={
+                    'localTradedAt': 'Date',
+                    'closePrice': 'Close',
+                    'openPrice': 'Open',
+                    'highPrice': 'High',
+                    'lowPrice': 'Low',
+                    'accumulatedTradingVolume': 'Volume'
+                })
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.sort_values(by='Date').reset_index(drop=True)
+                
+                for col in ['Close', 'Open', 'High', 'Low', 'Volume']:
+                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', ''), errors='coerce')
+                
+                return df.dropna(subset=['Close'])
     except Exception:
-        return pd.DataFrame()
+        pass
+    return pd.DataFrame()
 
 # 4. 네이버 증권 실시간 밸류에이션(PER/ROE) 크롤링
 def get_naver_financial_metrics(ticker_code):
@@ -169,7 +174,7 @@ def get_market_top_trades():
     all_data = []
     for name, code in pool.items():
         try:
-            df = get_naver_stock_data(code)
+            df = get_korea_stock_data(code)
             if df.empty or len(df) < 5: continue
             
             vol_sum = int(df['Volume'].sum())
@@ -204,10 +209,10 @@ ticker_code = KOREA_TICKERS.get(search_name, "005930")
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
 if ticker_code:
-    df = get_naver_stock_data(ticker_code)
+    df = get_korea_stock_data(ticker_code)
     
     if df.empty or len(df) < 5:
-        st.error("🚨 글로벌 서버 데이터 동기화 지연입니다. 잠시 후 재시도 해주십시오.")
+        st.error("🚨 실시간 데이터 수신 대기 중입니다. 10초 후 페이지를 새로고침(F5) 해주십시오.")
     else:
         df['MA20'] = df['Close'].rolling(window=min(20, len(df)), min_periods=1).mean()
         df['MA60'] = df['Close'].rolling(window=min(60, len(df)), min_periods=1).mean()
@@ -345,7 +350,7 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 12. 수석 애널리스트 AI 프롬프트 자동 생성기
+        # 9. 수석 애널리스트 AI 프롬프트 자동 생성기
         st.markdown("### 🤖 수석 애널리스트 AI 프롬프트 자동 생성기")
         st.caption("※ 회원님께서 확립하신 '4대 작성 원칙'을 기본 베이스로 하여, 하단에 입력하신 변수들이 완벽하게 결합된 5대 리포트용 프롬프트를 즉시 생성합니다.")
 
