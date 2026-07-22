@@ -21,13 +21,13 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 차단 0% 하이브리드 주가 데이터 수집 엔진 (★ 3개년, 800거래일로 대폭 확장)
+# 3. 과거 4년(1,000거래일) 하이브리드 주가 데이터 수집 엔진
 @st.cache_data(ttl=120)
 def get_korea_stock_data(code):
     try:
-        url = f"https://m.stock.naver.com/api/price/v2/count/800/code/{code}/day"
+        url = f"https://m.stock.naver.com/api/price/v2/count/1000/code/{code}/day"
         headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X)'}
-        res = requests.get(url, headers=headers, timeout=3)
+        res = requests.get(url, headers=headers, timeout=4)
         if res.status_code == 200:
             data = res.json()
             if isinstance(data, list) and len(data) > 0:
@@ -45,9 +45,9 @@ def get_korea_stock_data(code):
         pass
 
     try:
-        url = f"https://finance.daum.net/api/quote/A{code}/days?page=1&perPage=800"
+        url = f"https://finance.daum.net/api/quote/A{code}/days?page=1&perPage=1000"
         headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.daum.net'}
-        res = requests.get(url, headers=headers, timeout=3)
+        res = requests.get(url, headers=headers, timeout=4)
         if res.status_code == 200:
             data = res.json().get('data', [])
             if data:
@@ -66,7 +66,7 @@ def get_korea_stock_data(code):
 
     return pd.DataFrame()
 
-# 4. ROE 및 PER 핀셋 추출 엔진 (BeautifulSoup 직접 DOM 탐색)
+# 4. ROE 및 PER 핀셋 추출 엔진
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
@@ -75,12 +75,9 @@ def get_naver_financial_metrics(ticker_code):
         res = requests.get(url, headers=headers, timeout=4)
         soup = BeautifulSoup(res.text, 'html.parser')
 
-        # PER 스캔
         r_per = soup.select_one('#_per')
-        if r_per:
-            metrics["PER"] = f"{r_per.get_text(strip=True)}배"
+        if r_per: metrics["PER"] = f"{r_per.get_text(strip=True)}배"
 
-        # ROE 스캔: 판다스 오류를 피하기 위해 HTML 태그 직접 타격
         ths = soup.select('div.cop_analysis th')
         for th in ths:
             if 'ROE' in th.get_text(strip=True):
@@ -135,7 +132,7 @@ def get_classified_news(ticker_code, search_name=""):
         pass
     return news_data
 
-# 6. 개별 동영상 즉시 재생 유튜브 링크 파싱 엔진
+# 6. 유튜브 링크 파싱 엔진
 @st.cache_data(ttl=600)
 def get_it_sin_youtube_insights():
     try:
@@ -153,13 +150,12 @@ def get_it_sin_youtube_insights():
         if not videos: raise Exception("Fallback")
         return videos
     except:
-        # RSS 실패 시에도 무조건 개별 영상으로 직행하도록 v=... 파라미터 적용
         return [
             {"제목": "[IT의신 이형수] HBM4 턴키 공정 및 커스텀 AI 반도체 수급 집중 분석", "링크": "https://www.youtube.com/watch?v=R9ZInN6xW58", "일자": "실시간"},
             {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/watch?v=Jm3X4XnKq08", "일자": "실시간"}
         ]
 
-# 7. 수급 랭킹 1~5위 스캐닝 엔진
+# 7. ★ [오류 해결] 수급 랭킹 엔진 최적화 (초경량 API 직접 타격 및 예외 처리)
 @st.cache_data(ttl=300)
 def get_market_top_trades():
     pool = {
@@ -171,10 +167,10 @@ def get_market_top_trades():
     all_data = []
     for name, code in pool.items():
         try:
-            # 수급 분석용으로는 고속 파싱을 위해 120일치만 가져옴
-            url = f"https://m.stock.naver.com/api/price/v2/count/120/code/{code}/day"
+            # 트래픽 과부하를 막기 위해 최근 10일 치 경량 데이터만 별도 요청
+            url = f"https://m.stock.naver.com/api/price/v2/count/10/code/{code}/day"
             headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get(url, headers=headers, timeout=3)
+            res = requests.get(url, headers=headers, timeout=2)
             if res.status_code == 200:
                 data = res.json()
                 if isinstance(data, list) and len(data) >= 5:
@@ -189,19 +185,25 @@ def get_market_top_trades():
                     f_vol = int(vol_sum * (0.25 if price_chg >= 0 else -0.22))
                     i_vol = int(vol_sum * (0.20 if price_chg >= 0 else -0.18))
                     all_data.append({"name": name, "f_vol": f_vol, "i_vol": i_vol, "net_sum": f_vol + i_vol})
-        except: continue
+        except: 
+            continue
+
+    # 데이터 통신 완전 실패 시 표 붕괴 방지용 더미(Fallback) 로직
+    if not all_data:
+        for name in list(pool.keys())[:5]:
+            all_data.append({"name": name, "f_vol": 0, "i_vol": 0, "net_sum": 0})
 
     df_all = pd.DataFrame(all_data)
-    df_buy = df_all.sort_values(by="net_sum", ascending=False).reset_index(drop=True).head(5) if not df_all.empty else pd.DataFrame()
-    df_sell = df_all.sort_values(by="net_sum", ascending=True).reset_index(drop=True).head(5) if not df_all.empty else pd.DataFrame()
+    df_buy = df_all.sort_values(by="net_sum", ascending=False).reset_index(drop=True).head(5)
+    df_sell = df_all.sort_values(by="net_sum", ascending=True).reset_index(drop=True).head(5)
 
     b_list, s_list = [], []
     for i in range(len(df_buy)):
         r = df_buy.iloc[i]
-        b_list.append({"순위": f"{i+1}위", "외국인 매수 집중 종목": r["name"], "외국인 순매수량": f"+{abs(r['f_vol']):,}주", "기관 매수 집중 종목": r["name"], "기관 순매수량": f"+{abs(r['i_vol']):,}주"})
+        b_list.append({"순위": f"{i+1}위", "외국인 매수 집중 종목": r["name"], "외국인 순매수량": f"+{abs(r['f_vol']):,}주" if r['f_vol'] != 0 else "데이터 지연", "기관 매수 집중 종목": r["name"], "기관 순매수량": f"+{abs(r['i_vol']):,}주" if r['i_vol'] != 0 else "데이터 지연"})
     for i in range(len(df_sell)):
         r = df_sell.iloc[i]
-        s_list.append({"순위": f"{i+1}위", "외국인 매도 집중 종목": r["name"], "외국인 순매도량": f"-{abs(r['f_vol']):,}주", "기관 매도 집중 종목": r["name"], "기관 순매도량": f"-{abs(r['i_vol']):,}주"})
+        s_list.append({"순위": f"{i+1}위", "외국인 매도 집중 종목": r["name"], "외국인 순매도량": f"-{abs(r['f_vol']):,}주" if r['f_vol'] != 0 else "데이터 지연", "기관 매도 집중 종목": r["name"], "기관 순매도량": f"-{abs(r['i_vol']):,}주" if r['i_vol'] != 0 else "데이터 지연"})
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
 # 8. 메인 UI 렌더링
@@ -364,8 +366,8 @@ if ticker_code:
 
         st.markdown("---")
 
-        # ★ [수정 완료] 주가 기술적 분석 차트 (최근 3개년 데이터 및 슬라이더 스와이프 기능 탑재)
-        st.markdown("### 📈 주가 기술적 분석 차트 (최근 3개년 장기 추세 및 거래량)")
+        # 주가 기술적 분석 차트 (4년치 데이터 반영)
+        st.markdown("### 📈 주가 기술적 분석 차트 (과거 4년 장기 추세 및 거래량)")
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="주가"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
@@ -373,6 +375,48 @@ if ticker_code:
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
         fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
         
-        # 하단 미니맵(Rangeslider) 활성화로 3년 치 데이터를 직관적으로 탐색 가능하도록 적용
         fig.update_layout(xaxis_rangeslider_visible=True, height=600, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("---")
+
+        # ★ [복원 완료] 회원님 전용 AI 프롬프트 자동 생성기 
+        st.markdown("### 🤖 수석 애널리스트 AI 프롬프트 자동 생성기")
+        st.caption("※ 4대 작성 원칙과 5대 리포트 시나리오가 완벽하게 결합된 프롬프트입니다.")
+
+        col_p1, col_p2, col_p3 = st.columns(3)
+        compare_name = col_p1.text_input("📊 비교 종목", "현대차")
+        target_sector = col_p2.text_input("🏢 관심 섹터", "반도체/AI")
+        target_theme = col_p3.text_input("🚀 관심 테마", "SMR (소형모듈원전)")
+        
+        held_stock = st.text_input("💼 보유 종목", "1Q S&P500")
+
+        master_prompt = """너는 20년 경력의 글로벌 자산운용사 수석 주식 애널리스트야. 아래 4가지 원칙을 반드시 지켜서 답해줘.
+1. 거대 자금을 운용해 온 전문가답게 신뢰감 있고 권위 있는 말투를 사용할 것
+2. 최근 6개월 이내의 데이터와 오늘 기준의 실시간 정보를 바탕으로 분석할 것
+3. 차트 중심의 기술적 분석과 기업 가치 중심의 기본적 분석을 함께 고려할 것
+4. 장점뿐 아니라 리스크도 충분히 설명하고, 어려운 용어는 초보자도 이해할 수 있게 일상적인 비유로 풀어줄 것
+
+---"""
+        
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["① 뉴스 정밀 해부", "② 가치투자 비교", "③ 미 증시 브리핑", "④ 수급/차트 추적", "⑤ 구조적 주도주"])
+
+        with tab1:
+            p1 = f"{master_prompt}\n\n너는 냉철한 주식 시장 분석가야. 방금 나온 '{search_name}'의 뉴스 [제목/내용 요약]을 분석해 줘. 이 뉴스가 단기 및 중장기적으로 주가에 긍정적인지 부정적인지 판단하고, 그 핵심 이유를 3가지로 명확히 요약해 줘. 마지막으로 이 뉴스를 해석할 때 개인 투자자가 흔히 범할 수 있는 오류나 주의해야 할 리스크도 함께 짚어줘"
+            st.code(p1, language="markdown")
+
+        with tab2:
+            p2 = f"{master_prompt}\n\n너는 가치투자 전문가야. '{search_name}'와(과) '{compare_name}'를 비교 분석하려고 해. 두 회사의 최근 분기 기준 실적 추이와 PER, PBR, ROE, 영업이익률 수치를 표로 깔끔하게 정리해서 비교해 줘. 이를 바탕으로 현재 시점에서 어떤 종목이 더 저평가되어 매력적인지, 수익성 측면에서는 누가 더 우위에 있는지 투자 초보자도 이해하기 쉽게 설명해줘"
+            st.code(p2, language="markdown")
+
+        with tab3:
+            p3 = f"{master_prompt}\n\n어제 미국 증시에서 '{target_sector}' 지수와 주요 ETF의 흐름이 어땠는지 요약해 줘. 특히 글로벌 대장주(예: 엔비디아, 테슬라 등)와 관련된 최신 핵심 뉴스 중에서, 오늘 한국 시장의 '{held_stock}' 주가 흐름에 직접적인 영향을 줄 만한 요인만 3문장 이내로 짧고 강렬하게 브리핑해 줘"
+            st.code(p3, language="markdown")
+
+        with tab4:
+            p4 = f"{master_prompt}\n\n너는 글로벌 헤지펀드의 데이터 분석가야. 최근 한 달간 '{search_name}'에 대한 외국인과 기관의 누적 수급 동향을 기반으로 이들의 매매 패턴을 분석해 줘. 최근 발생한 대량 거래량을 동반한 매수/매도 주체가 누구인지 파악하고, 이것이 단기 차익 실현 성격인지 장기적 관점의 비중 확대인지 너의 논리적인 추론을 제시해 줘. 또한 향후 주가조정 시 강력한 지지선 역할을 할 가격대도 예측해 줘"
+            st.code(p4, language="markdown")
+
+        with tab5:
+            p5 = f"{master_prompt}\n\n너는 20년 경력의 톱티어 자산운용사 수석 애널리스트야. 2026년 현재의 금리 기조와 환율, 그리고 '{target_theme}' 산업의 구조적 변화를 종합적으로 반영해서 분석 리포트를 작성해 줘. 향후 6개월에서 1년간 주식 시장의 상승을 주도할 가장 유망한 세부 업종 3가지를 선정하고, 각 업종 내에서 기술력과 시장 점유율을 독점하고 있는 확실한 대장주를 하나씩 추천해 줘. 추천 근거는 구체적인 데이터나 예상 시나리오를 바탕으로 작성해"
+            st.code(p5, language="markdown")
