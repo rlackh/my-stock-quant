@@ -93,7 +93,7 @@ def get_naver_financial_metrics(ticker_code):
         pass
     return metrics
 
-# 5. ★ [수정 완료] PC/모바일 100% 호환 모바일 뉴스 반응형 파싱 엔진
+# 5. PC/모바일 100% 호환 모바일 뉴스 반응형 파싱 엔진
 def get_classified_news(ticker_code, search_name=""):
     news_data = {"기회": [], "중립": [], "위기": []}
     try:
@@ -120,7 +120,6 @@ def get_classified_news(ticker_code, search_name=""):
             link_tag = titles[i]
             raw_href = link_tag.get('href', '')
             
-            # 모바일/PC 스마트폰 완전 호환 반응형 뉴스 URL 구조로 변환
             parsed_url = urlparse(raw_href)
             query_params = parse_qs(parsed_url.query)
             article_id = query_params.get('article_id', [''])[0]
@@ -366,7 +365,7 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 주가 기술적 분석 차트 (4년치 데이터 반영)
+        # 주가 기술적 분석 차트
         st.markdown("### 📈 주가 기술적 분석 차트 (과거 4년 장기 추세 및 거래량)")
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="주가"), row=1, col=1)
@@ -375,5 +374,52 @@ if ticker_code:
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
         fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
         
-        fig.update_layout(xaxis_rangeslider_visible=True, height=600, margin=dict(t=10, b=10, l=10, r=10))
+        fig.update_layout(xaxis_rangeslider_visible=True, height=580, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
+
+        # ★ [신규 탑재] 차트 직하단 수석 애널리스트 차트 정밀 분석 엔진
+        st.markdown("#### 🔍 수석 애널리스트 차트 정밀 패턴 및 수급 분석")
+        
+        # 1. 이동평균선 배열 및 추세 진단
+        ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
+        ma60_val = float(last_row['MA60']) if pd.notna(last_row['MA60']) else 0
+        ma120_val = float(last_row['MA120']) if pd.notna(last_row['MA120']) else 0
+        
+        if current_price > ma20_val > ma60_val > ma120_val:
+            trend_desc = "🟢 **정배열 상승 추세 (Strong Uptrend)**: 단기·중기·장기 이동평균선이 안정적인 정배열을 구축하여 강력한 우상향 모멘텀을 형성하고 있습니다."
+        elif current_price < ma20_val < ma60_val < ma120_val:
+            trend_desc = "🔴 **완전 역배열 (Downtrend)**: 주가가 주요 이동평균선 하단에 눌려 있어 단기 반등 시 차익 매물 압박이 상존하는 보수적 구간입니다."
+        elif current_price > ma120_val:
+            trend_desc = "🔵 **장기 우상향 박스권 (Consolidation above 120MA)**: 120일 경기선 상단에서 주가가 매물을 소화하며 하단 지지선을 탄탄히 다지는 에너지를 축적하고 있습니다."
+        else:
+            trend_desc = "🟡 **혼조세 및 반등 탐색 구간**: 이평선들이 수렴하며 단기 수급 방향성을 재탐색하는 국면입니다."
+
+        # 2. 거래량 비율 계산
+        vol_5day = df['Volume'].tail(5).mean()
+        vol_20day = df['Volume'].tail(20).mean()
+        vol_ratio = (vol_5day / vol_20day * 100) if vol_20day > 0 else 100
+        
+        if vol_ratio >= 140:
+            vol_desc = f"🔥 **거래량 수급 분출 (평균 대비 {vol_ratio:.0f}%)**: 최근 거래량이 20일 평균을 크게 상회하며 메이저 세력의 활발한 손바꿈 현상이 관측됩니다."
+        elif vol_ratio <= 70:
+            vol_desc = f"🧊 **거래량 감쇄 구간 (평균 대비 {vol_ratio:.0f}%)**: 거래량이 줄어들며 주가 변동성이 축소되는 숨고르기 양상입니다."
+        else:
+            vol_desc = f"📊 **평년 수준 거래량 (평균 대비 {vol_ratio:.0f}%)**: 매물 이탈 없이 안정적인 거래 수급 밸런스를 유지하고 있습니다."
+
+        # 3. 주요 지지/저항 라인 산출
+        high_60 = df['High'].tail(60).max()
+        low_60 = df['Low'].tail(60).min()
+        
+        c_col1, c_col2, c_col3 = st.columns(3)
+        with c_col1:
+            st.info(f"**📈 1차 강력 저항선 (60일 최고가):**\n### {high_60:,.0f} 원")
+        with c_col2:
+            st.success(f"**📉 1차 핵심 지지선 (20일 이동평균):**\n### {ma20_val:,.0f} 원")
+        with c_col3:
+            st.warning(f"**🛡️ 2차 콘크리트 바닥선 (60일 최저가):**\n### {low_60:,.0f} 원")
+
+        st.markdown(f"""
+        * **[이평선 파동 진단]** {trend_desc}
+        * **[거래량 분석]** {vol_desc}
+        * **[RSI 수급 심리]** 현재 심리지표는 **RSI {rsi_display}** 수준으로, {"과매도(침체) 구간에 도달하여 기술적 반등 타점이 임박했습니다." if rsi_val < 35 else ("단기 과열권에 진입하여 부분 차익실현을 고려할 구간입니다." if rsi_val > 70 else "과열이나 침체 없이 안정적인 수급 흐름을 보여주고 있습니다.")}
+        """)
