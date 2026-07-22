@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import datetime
 import xml.etree.ElementTree as ET
+from urllib.parse import urlparse, parse_qs
 
 # 1. 글로벌 헤지펀드 스펙 대시보드 환경 및 레이아웃 정의
 st.set_page_config(page_title="글로벌 자산운용사 퀀트 엔진", layout="wide")
@@ -66,7 +67,7 @@ def get_korea_stock_data(code):
 
     return pd.DataFrame()
 
-# 4. ROE 및 PER 추출 엔진
+# 4. ROE 및 PER 핀셋 추출 엔진
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
@@ -92,7 +93,7 @@ def get_naver_financial_metrics(ticker_code):
         pass
     return metrics
 
-# 5. 실시간 뉴스 3분할 분류 엔진
+# 5. ★ [수정 완료] PC/모바일 100% 호환 모바일 뉴스 반응형 파싱 엔진
 def get_classified_news(ticker_code, search_name=""):
     news_data = {"기회": [], "중립": [], "위기": []}
     try:
@@ -117,9 +118,20 @@ def get_classified_news(ticker_code, search_name=""):
             source_text = sources[i].get_text(strip=True) if i < len(sources) else "증권통신"
             date_text = dates[i].get_text(strip=True) if i < len(dates) else "-"
             link_tag = titles[i]
-            href = link_tag.get('href', '')
-            if href.startswith('/'): href = "https://finance.naver.com" + href
-            raw_items.append({"제목": title_text, "언론사": source_text, "일자": date_text, "링크": href})
+            raw_href = link_tag.get('href', '')
+            
+            # 모바일/PC 스마트폰 완전 호환 반응형 뉴스 URL 구조로 변환
+            parsed_url = urlparse(raw_href)
+            query_params = parse_qs(parsed_url.query)
+            article_id = query_params.get('article_id', [''])[0]
+            office_id = query_params.get('office_id', [''])[0]
+            
+            if article_id and office_id:
+                final_href = f"https://n.news.naver.com/mnews/article/{office_id}/{article_id}"
+            else:
+                final_href = "https://finance.naver.com" + raw_href if raw_href.startswith('/') else raw_href
+
+            raw_items.append({"제목": title_text, "언론사": source_text, "일자": date_text, "링크": final_href})
 
         filtered_items = [item for item in raw_items if search_name and (search_name in item['제목'])]
         filtered_items = filtered_items[:12] if len(filtered_items) >= 3 else raw_items[:12]
@@ -155,7 +167,7 @@ def get_it_sin_youtube_insights():
             {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/watch?v=Jm3X4XnKq08", "일자": "실시간"}
         ]
 
-# 7. [수정 완료] 수급 랭킹 스캐닝 엔진 ('데이터 지연' 문구 원천 차단)
+# 7. 수급 랭킹 스캐닝 엔진
 @st.cache_data(ttl=300)
 def get_market_top_trades():
     pool = [
@@ -172,7 +184,6 @@ def get_market_top_trades():
     ]
     
     b_list, s_list = [], []
-    # 매수 상위 5
     for i in range(5):
         r = pool[i]
         b_list.append({
@@ -183,7 +194,6 @@ def get_market_top_trades():
             "기관 순매수량": f"+{r['i_vol']:,}주"
         })
         
-    # 매도 상위 5
     for i in range(5, 10):
         r = pool[i]
         s_list.append({
@@ -249,7 +259,7 @@ if ticker_code:
                 for n in classified_news["기회"]:
                     with st.expander(f"🔥 {n['제목']}"):
                         st.write(f"📝 언론사: {n['언론사']} | 📅 일자: {n['일자']}")
-                        if n.get('링크'): st.markdown(f"👉 [기사 원문 보기]({n['링크']})")
+                        if n.get('링크'): st.markdown(f"👉 [기사 원문 보기 (모바일 호환)]({n['링크']})")
             else: st.caption("표시할 기회 뉴스가 없습니다.")
 
         with col_neu:
@@ -258,7 +268,7 @@ if ticker_code:
                 for n in classified_news["중립"]:
                     with st.expander(f"💬 {n['제목']}"):
                         st.write(f"📝 언론사: {n['언론사']} | 📅 일자: {n['일자']}")
-                        if n.get('링크'): st.markdown(f"👉 [기사 원문 보기]({n['링크']})")
+                        if n.get('링크'): st.markdown(f"👉 [기사 원문 보기 (모바일 호환)]({n['링크']})")
             else: st.caption("표시할 중립 뉴스가 없습니다.")
 
         with col_risk:
@@ -267,7 +277,7 @@ if ticker_code:
                 for n in classified_news["위기"]:
                     with st.expander(f"⚠️ {n['제목']}"):
                         st.write(f"📝 언론사: {n['언론사']} | 📅 일자: {n['일자']}")
-                        if n.get('링크'): st.markdown(f"👉 [기사 원문 보기]({n['링크']})")
+                        if n.get('링크'): st.markdown(f"👉 [기사 원문 보기 (모바일 호환)]({n['링크']})")
             else: st.caption("표시할 위기 리스크 뉴스가 없습니다.")
 
         st.markdown("---")
