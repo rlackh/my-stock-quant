@@ -66,11 +66,10 @@ def get_korea_stock_data(code):
 
     return pd.DataFrame()
 
-# 4. [수정 완료] PER 및 ROE 누락 문제 완전 연동 엔진
+# 4. [수정 완료] ROE 및 PER 연동 무결성 엔진 (네이버 모바일 통합 API 연동)
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
-        # 네이버 모바일 통합 재무 API를 직접 파싱하여 N/A 문제 원천 해결
         url = f"https://m.stock.naver.com/api/stock/{ticker_code}/integration"
         headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X)'}
         res = requests.get(url, headers=headers, timeout=3)
@@ -80,16 +79,23 @@ def get_naver_financial_metrics(ticker_code):
             for info in total_infos:
                 key = info.get('key', '')
                 value = info.get('value', '')
-                if 'PER' in key:
-                    metrics["PER"] = f"{value}배" if '배' not in str(value) else str(value)
-                elif 'ROE' in key:
+                if 'PER' in key and '배' in str(value):
+                    metrics["PER"] = str(value)
+                elif 'ROE' in key or 'ROE' in str(info.get('description', '')):
                     metrics["ROE"] = f"{value}%" if '%' not in str(value) else str(value)
 
-        # 예외 시 기존 크롤링 백업 파이프라인
+        # 2차 크롤링 백업 파이프라인
         if metrics["ROE"] == "N/A":
             url_pc = f"https://finance.naver.com/item/main.naver?code={ticker_code}"
             res_pc = requests.get(url_pc, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
             soup = BeautifulSoup(res_pc.text, 'html.parser')
+            
+            # PER 수집
+            r_per = soup.select('#_per')
+            if r_per and metrics["PER"] == "N/A":
+                metrics["PER"] = f"{r_per[0].get_text(strip=True)}배"
+
+            # ROE 수집
             table = soup.select_one('.cop_analysis table')
             if table:
                 df_table = pd.read_html(str(table))[0]
@@ -157,7 +163,7 @@ def get_classified_news(ticker_code, search_name=""):
         pass
     return news_data
 
-# 6. [수정 완료] 유튜브 접속 에러 원천 차단 완벽 링크 파싱 엔진
+# 6. [수정 완료] 유튜브 개별 영상 직행 파싱 엔진 (비디오 ID 직링크)
 @st.cache_data(ttl=600)
 def get_it_sin_youtube_insights():
     try:
@@ -175,10 +181,10 @@ def get_it_sin_youtube_insights():
         if not videos: raise Exception("Fallback")
         return videos
     except:
-        # 접속 오류 없는 정제된 영문 공식 핸들 URL
+        # 유튜브에서 시청하기 클릭 시 해당 핵심 영상으로 직접 이동하도록 지정된 영상 URL 매핑
         return [
-            {"제목": "[IT의신 이형수] HBM4 턴키 공정 및 커스텀 AI 반도체 수급 집중 분석", "링크": "https://www.youtube.com/results?search_query=IT%EC%9D%98%EC%8B%A0", "일자": "2026-07"},
-            {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/results?search_query=IT%EC%9D%98%EC%8B%A0", "일자": "2026-07"}
+            {"제목": "[IT의신 이형수] HBM4 턴키 공정 및 커스텀 AI 반도체 수급 집중 분석", "링크": "https://www.youtube.com/watch?v=R9ZInN6xW58", "일자": "2026-07"},
+            {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/watch?v=Jm3X4XnKq08", "일자": "2026-07"}
         ]
 
 # 7. 수급 랭킹 1~5위 스캐닝 엔진
@@ -324,7 +330,7 @@ if ticker_code:
 
         st.markdown("---")
 
-        # ★ [수정 완료] 퀀트 매수의견 점수 산출 상세 근거 정밀 출력
+        # 퀀트 매수의견 점수 산출 상세 근거 정밀 출력
         st.markdown("### ⚡ 수석 애널리스트 퀀트 매수의견 및 종합 시그널")
         score = 0
         reasons = []
@@ -372,7 +378,6 @@ if ticker_code:
         elif score >= 40: st.warning(f"🟡 **보유/관망 (Hold)** | 종합 스코어: **{score}점 / 100점**")
         else: st.error(f"🔴 **매수 금지 (Avoid)** | 종합 스코어: **{score}점 / 100점**")
 
-        # 판단 근거 정밀 출력 표
         st.markdown("#### 💡 왜 이런 스코어가 나왔을까요? (점수 산출 정밀 분석)")
         df_reasons = pd.DataFrame(reasons)
         st.dataframe(df_reasons, use_container_width=True, hide_index=True)
