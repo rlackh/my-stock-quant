@@ -21,7 +21,7 @@ KOREA_TICKERS = {
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
 }
 
-# 3. 과거 4년(1,000거래일) 하이브리드 주가 데이터 수집 엔진
+# 3. [확장 완료] 4년(1,000거래일) 하이브리드 주가 데이터 수집 엔진
 @st.cache_data(ttl=120)
 def get_korea_stock_data(code):
     # 1차: 네이버 모바일 API (1000일치 데이터 요청)
@@ -135,7 +135,7 @@ def get_classified_news(ticker_code, search_name=""):
         pass
     return news_data
 
-# 6. ★ [수정 완료] 클릭 시 해당 동영상이 직접 즉시 재생되는 유튜브 파싱 엔진
+# 6. 개별 동영상 즉시 재생 유튜브 링크 파싱 엔진
 @st.cache_data(ttl=600)
 def get_it_sin_youtube_insights():
     try:
@@ -153,7 +153,6 @@ def get_it_sin_youtube_insights():
         if not videos: raise Exception("Fallback")
         return videos
     except:
-        # 실제 재생 가능한 유튜브 핵심 동영상 직링크 URL 매핑
         return [
             {"제목": "[IT의신 이형수] HBM4 턴키 공정 및 커스텀 AI 반도체 수급 집중 분석", "링크": "https://www.youtube.com/watch?v=R9ZInN6xW58", "일자": "실시간"},
             {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/watch?v=Jm3X4XnKq08", "일자": "실시간"}
@@ -171,6 +170,7 @@ def get_market_top_trades():
     all_data = []
     for name, code in pool.items():
         try:
+            # 수급 분석은 최근 변동성이 중요하므로 120일 데이터로 고속 스캔
             url = f"https://m.stock.naver.com/api/price/v2/count/120/code/{code}/day"
             headers = {'User-Agent': 'Mozilla/5.0'}
             res = requests.get(url, headers=headers, timeout=3)
@@ -181,7 +181,7 @@ def get_market_top_trades():
                     df['closePrice'] = pd.to_numeric(df['closePrice'].astype(str).str.replace(',', ''), errors='coerce')
                     df['accumulatedTradingVolume'] = pd.to_numeric(df['accumulatedTradingVolume'].astype(str).str.replace(',', ''), errors='coerce')
                     
-                    recent = df.head(7)
+                    recent = df.head(7) # 최근 7거래일 데이터
                     vol_sum = int(recent['accumulatedTradingVolume'].sum())
                     price_chg = ((recent['closePrice'].iloc[0] - recent['closePrice'].iloc[-1]) / recent['closePrice'].iloc[-1]) * 100
                     
@@ -287,8 +287,7 @@ if ticker_code:
             st.markdown("#### 🎙️ 최신 전문가 심층 방송 피드")
             for v in yt_videos:
                 with st.expander(f"📌 {v['제목']} ({v['일자']})"):
-                    st.write(f"🔗 [유튜브 앱/웹에서 바로 재생하기]({v['링크']})")
-                    st.video(v['링크']) # 앱 내부에서 즉시 시청 가능하도록 플레이어 내장
+                    st.write(f"🔗 방송 링크: [유튜브에서 시청하기]({v['링크']})")
         with col_y2:
             st.markdown("#### 💡 퀀트 종합 연계 유망 톱픽 추천")
             st.info("**[탑픽 추천 1] SK하이닉스 (000660)**\n* 근거: HBM4 턴키 공정 독점력 및 AI 메모리 수급 집중 수혜")
@@ -306,7 +305,7 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 퀀트 매수의견 점수 산출 상세 근거 정밀 출력
+        # 퀀트 매수의견 및 상세 산출 근거
         st.markdown("### ⚡ 수석 애널리스트 퀀트 매수의견 및 종합 시그널")
         score = 0
         reasons = []
@@ -373,5 +372,6 @@ if ticker_code:
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
         fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
         
+        # 차트에 하단 슬라이더를 추가하여 4년치 데이터를 편하게 드래그하며 볼 수 있도록 지원
         fig.update_layout(xaxis_rangeslider_visible=True, height=600, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
