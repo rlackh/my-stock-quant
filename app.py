@@ -205,24 +205,24 @@ def get_market_top_trades():
         
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 8. 사이드바 통합 검색 패널 및 3단계 매수가/투자금 직접 입력
+# 8. 사이드바 통합 검색 패널 및 3단계 매수가/투입금액 입력
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 ticker_code = KOREA_TICKERS.get(search_name, "005930")
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
 st.sidebar.markdown("---")
-st.sidebar.header("💼 내 평단가 및 3단계 분할 단가 설정")
-user_buy_price = st.sidebar.number_input("내 현재 평단가/1차 매수가 (원)", value=70000, step=500)
+st.sidebar.header("💼 내 평단가 및 3단계 분할 전략 설정")
+user_buy_price = st.sidebar.number_input("내 현재 보유 평단가 / 1차 단가 (원)", value=70000, step=500)
+budget_p1 = st.sidebar.number_input("1차 매수 보유/투입 금액 (원)", value=3000000, step=500000)
 
-st.sidebar.subheader("🎯 분할 매수 예정 단가 직접 입력")
-target_p2 = st.sidebar.number_input("2차 눌림목 목표 단가 (원)", value=int(user_buy_price * 0.95), step=500)
-target_p3 = st.sidebar.number_input("3차 바닥선 목표 단가 (원)", value=int(user_buy_price * 0.90), step=500)
+st.sidebar.subheader("🎯 2차 추가 매수 설정")
+target_p2 = st.sidebar.number_input("2차 매수 지정 단가 (원)", value=int(user_buy_price * 0.95), step=500)
+budget_p2 = st.sidebar.number_input("2차 매수 투입 금액 (원)", value=4000000, step=500000)
 
-st.sidebar.subheader("💰 단계별 투입 예산 (원)")
-budget_p1 = st.sidebar.number_input("1차 투입 예산 (원)", value=3000000, step=500000)
-budget_p2 = st.sidebar.number_input("2차 투입 예산 (원)", value=4000000, step=500000)
-budget_p3 = st.sidebar.number_input("3차 투입 예산 (원)", value=3000000, step=500000)
+st.sidebar.subheader("🛡️ 3차 추가 매수 설정")
+target_p3 = st.sidebar.number_input("3차 매수 지정 단가 (원)", value=int(user_buy_price * 0.90), step=500)
+budget_p3 = st.sidebar.number_input("3차 매수 투입 금액 (원)", value=3000000, step=500000)
 
 if ticker_code:
     df = get_korea_stock_data(ticker_code)
@@ -279,38 +279,62 @@ if ticker_code:
             elif 0 <= profit_rate < 10.0:
                 st.info(f"🔵 **[안정적 보유 구간 | +{profit_rate:.2f}%]**: 무난한 수익 상태입니다. 20일선({ma20_v:,.0f}원) 지지력을 바탕으로 홀딩을 유지하십시오.")
             elif -10.0 < profit_rate < 0:
-                st.warning(f"🟡 **[단기 눌림목 구간 | {profit_rate:.2f}%]**: 주가가 평단가보다 소폭 아래입니다. 감정적 뇌동매매를 자제하고 분할 매수 스케줄을 활용하십시오.")
+                st.warning(f"🟡 **[단기 눌림목 구간 | {profit_rate:.2f}%]**: 주가가 평단가보다 소폭 아래입니다. 감정적 뇌동매매를 자제하고 하단 분할 매수 스케줄을 활용하십시오.")
             else:
                 st.error(f"🔴 **[위험 관리 구간 | {profit_rate:.2f}%]**: 평단가 대비 -10% 이상 손실 구간입니다. 정해둔 손절 라인을 기계적으로 준수하십시오.")
             st.markdown("---")
 
-            # ★ [직접 입력 단가 기반] 기관 투자자식 3단계 분할 매수/매도 정밀 계산기
-            st.markdown(f"### 🧮 기관 투자자식 [{search_name}] 3단계 분할 매수/매도 정밀 포트폴리오 스케줄")
-            st.caption("※ 사이드바에서 입력하신 **목표 단가 및 투입 예산**으로 100% 정밀 계산된 스케줄표입니다.")
+            # ★ [수정 완료] 단계별 대응 금액 및 누적 평단가 정밀 계산기
+            st.markdown(f"### 🧮 기관 투자자식 [{search_name}] 3단계 분할 매수 대응 금액 및 단계별 누적 평단가 스케줄")
+            st.caption("※ 각 차수별 체결 시 실시간으로 하향 조정되는 **누적 평단가(Rolling Average Price)**를 표시합니다.")
 
             # 수량 계산
             q1 = int(budget_p1 / user_buy_price) if user_buy_price > 0 else 0
+            spent_1 = q1 * user_buy_price
+            avg_1 = user_buy_price
+
             q2 = int(budget_p2 / target_p2) if target_p2 > 0 else 0
+            spent_2 = q2 * target_p2
+            tot_qty_2 = q1 + q2
+            tot_spent_2 = spent_1 + spent_2
+            avg_2 = int(tot_spent_2 / tot_qty_2) if tot_qty_2 > 0 else user_buy_price
+
             q3 = int(budget_p3 / target_p3) if target_p3 > 0 else 0
+            spent_3 = q3 * target_p3
+            tot_qty_3 = q1 + q2 + q3
+            tot_spent_3 = spent_1 + spent_2 + spent_3
+            avg_3 = int(tot_spent_3 / tot_qty_3) if tot_qty_3 > 0 else avg_2
 
-            tot_qty = q1 + q2 + q3
-            tot_spent = (q1 * user_buy_price) + (q2 * target_p2) + (q3 * target_p3)
-            
-            # 분할 매수 완결 시 하향 평단가 정밀 계산
-            exact_avg_price = int(tot_spent / tot_qty) if tot_qty > 0 else user_buy_price
-
-            calc_target_exit = int(exact_avg_price * 1.15) # +15% 목표가
-            calc_stop_loss = int(exact_avg_price * 0.95)   # -5% 손절가
+            calc_target_exit = int(avg_3 * 1.15) # +15% 목표가
+            calc_stop_loss = int(avg_3 * 0.95)   # -5% 손절가
 
             schedule_df = pd.DataFrame([
-                {"단계": "1차 대응", "구분/매커니즘": "현재 평단가 / 1차 진입", "지정 매수 단가": f"{user_buy_price:,.0f} 원", "배정 예산": f"{budget_p1:,.0f} 원", "체결 수량": f"{q1:,} 주"},
-                {"단계": "2차 대응", "구분/매커니즘": "2차 눌림목 타점", "지정 매수 단가": f"{target_p2:,.0f} 원", "배정 예산": f"{budget_p2:,.0f} 원", "체결 수량": f"{q2:,} 주"},
-                {"단계": "3차 대응", "구분/매커니즘": "3차 바닥 지지선", "지정 매수 단가": f"{target_p3:,.0f} 원", "배정 예산": f"{budget_p3:,.0f} 원", "체결 수량": f"{q3:,} 주"},
+                {
+                    "대응 단계": "1차 대응 (기보유/시초)",
+                    "지정 매수 단가": f"{user_buy_price:,.0f} 원",
+                    "차수별 집행 금액": f"{spent_1:,.0f} 원",
+                    "체결 수량": f"{q1:,} 주",
+                    "★ 체결 후 누적 평단가": f"{avg_1:,.0f} 원"
+                },
+                {
+                    "대응 단계": "2차 대응 (눌림목 타점)",
+                    "지정 매수 단가": f"{target_p2:,.0f} 원",
+                    "차수별 집행 금액": f"{spent_2:,.0f} 원",
+                    "체결 수량": f"{q2:,} 주",
+                    "★ 체결 후 누적 평단가": f"{avg_2:,.0f} 원 (📉 하향)"
+                },
+                {
+                    "대응 단계": "3차 대응 (바닥 지지선)",
+                    "지정 매수 단가": f"{target_p3:,.0f} 원",
+                    "차수별 집행 금액": f"{spent_3:,.0f} 원",
+                    "체결 수량": f"{q3:,} 주",
+                    "★ 체결 후 누적 평단가": f"{avg_3:,.0f} 원 (📉 최후 완결)"
+                },
             ])
             st.dataframe(schedule_df, use_container_width=True, hide_index=True)
 
             q_col1, q_col2, q_col3 = st.columns(3)
-            q_col1.info(f"**📉 3단계 완료 시 최종 예상 평단가:**\n### {exact_avg_price:,.0f} 원")
+            q_col1.info(f"**📉 3단계 분할 완료 시 최종 하향 평단가:**\n### {avg_3:,.0f} 원")
             q_col2.success(f"**🎯 1차 권장 목표 익절가 (+15%):**\n### {calc_target_exit:,.0f} 원")
             q_col3.error(f"**🚨 최종 기계적 손절가 (-5%):**\n### {calc_stop_loss:,.0f} 원")
             st.markdown("---")
