@@ -67,9 +67,9 @@ def get_korea_stock_data(code):
 
     return pd.DataFrame()
 
-# 4. ROE, PER 및 BPS(적정주가 계산용) 핀셋 추출 엔진
+# 4. ROE 및 PER 핀셋 추출 엔진
 def get_naver_financial_metrics(ticker_code):
-    metrics = {"PER": "N/A", "ROE": "N/A", "ROE_val": 0.0, "BPS_val": 0.0}
+    metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
         url = f"https://finance.naver.com/item/main.naver?code={ticker_code}"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -81,24 +81,14 @@ def get_naver_financial_metrics(ticker_code):
 
         ths = soup.select('div.cop_analysis th')
         for th in ths:
-            th_text = th.get_text(strip=True)
-            if 'ROE' in th_text:
+            if 'ROE' in th.get_text(strip=True):
                 tr = th.find_parent('tr')
                 if tr:
                     tds = tr.select('td')
                     valid_vals = [td.get_text(strip=True) for td in tds if td.get_text(strip=True) not in ['', '-', 'N/A', 'nan']]
                     if valid_vals:
                         metrics["ROE"] = f"{valid_vals[-1]}%"
-                        try: metrics["ROE_val"] = float(valid_vals[-1].replace(',', ''))
-                        except: pass
-            elif 'BPS' in th_text:
-                tr = th.find_parent('tr')
-                if tr:
-                    tds = tr.select('td')
-                    valid_vals = [td.get_text(strip=True) for td in tds if td.get_text(strip=True) not in ['', '-', 'N/A', 'nan']]
-                    if valid_vals:
-                        try: metrics["BPS_val"] = float(valid_vals[-1].replace(',', ''))
-                        except: pass
+                break
     except:
         pass
     return metrics
@@ -215,19 +205,16 @@ def get_market_top_trades():
         
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 8. 사이드바 통합 검색 패널 및 매수가/투자금액 입력
+# 8. 사이드바 통합 검색 패널 및 매수가 입력
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 ticker_code = KOREA_TICKERS.get(search_name, "005930")
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
 st.sidebar.markdown("---")
-st.sidebar.header("💼 보유 주식 정밀 진단")
+st.sidebar.header("💼 보유 주식 정밀 진단 및 퀀트 분할 매수")
 user_buy_price = st.sidebar.number_input("내 평단가(매수가) 입력 (원)", value=0, step=100)
-
-st.sidebar.markdown("---")
-st.sidebar.header("🧮 3단계 분할 매수 계산기")
-total_invest_budget = st.sidebar.number_input("투자 예정 금액 입력 (원)", value=10000000, step=1000000)
+total_invest_budget = st.sidebar.number_input("추가/신규 투자 예정 금액 (원)", value=10000000, step=1000000)
 
 if ticker_code:
     df = get_korea_stock_data(ticker_code)
@@ -305,70 +292,44 @@ if ticker_code:
                 """)
             st.markdown("---")
 
-        # ★ [기능 2] S-RIM 기반 적정주가 계산 엔진
-        st.markdown(f"### 🎯 S-RIM(잔여이익모델) 기반 [{search_name}] 기업 절대 가치 평가")
-        roe_v = naver_metrics.get("ROE_val", 0.0)
-        bps_v = naver_metrics.get("BPS_val", 0.0)
-        required_return = 8.0  # 요구수익률 8% (국고채+위험프리미엄)
+            # ★ [입력 단가 직접 연동] 기관 투자자식 3단계 분할 매수/매도 포트폴리오 스케줄
+            st.markdown(f"### 🧮 기관 투자자식 [{search_name}] 3단계 분할 매수/매도 포트폴리오 스케줄")
+            st.caption("※ 사이드바에서 입력하신 **내 평단가(매수가)**를 기준 베이스로 계산된 분할 대응표입니다.")
 
-        if roe_v > 0 and bps_v > 0:
-            # S-RIM 공식: 적정주가 = BPS * (ROE / 요구수익률)
-            srim_fair_price = bps_v * (roe_v / required_return)
-            srim_buy_target = srim_fair_price * 0.8  # 20% 안전지대 할인 매수가
-            srim_sell_target = srim_fair_price * 1.2 # 20% 프리미엄 목표가
+            ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else user_buy_price * 0.97
+            ma60_val = float(last_row['MA60']) if pd.notna(last_row['MA60']) else user_buy_price * 0.93
 
-            s_col1, s_col2, s_col3 = st.columns(3)
-            s_col1.metric("이론적 적정주가 (100% 가치)", f"{srim_fair_price:,.0f} 원")
-            s_col2.metric("안전 매수 적정가 (80% 타점)", f"{srim_buy_target:,.0f} 원")
-            s_col3.metric("목표 익절가 (120% 구간)", f"{srim_sell_target:,.0f} 원")
+            p1_price = int(user_buy_price)
+            p2_price = int(ma20_val)
+            p3_price = int(ma60_val)
 
-            valuation_ratio = (current_price / srim_fair_price) * 100
-            if current_price < srim_buy_target:
-                st.success(f"🟢 **[저평가 절대 매력 구간]**: 현재가({current_price:,.0f}원)가 S-RIM 적정주가 대비 **{valuation_ratio:.1f}% 수준**으로 펀더멘탈 대비 매우 저평가되어 있습니다.")
-            elif srim_buy_target <= current_price <= srim_sell_target:
-                st.info(f"🔵 **[적정 가치 반영 구간]**: 현재가({current_price:,.0f}원)가 S-RIM 적정주가 범주(**{valuation_ratio:.1f}% 수준**) 내에서 정당하게 거래되고 있습니다.")
-            else:
-                st.warning(f"🟡 **[고평가 유의 구간]**: 현재가({current_price:,.0f}원)가 S-RIM 적정가 대비 **{valuation_ratio:.1f}% 수준**으로 프리미엄이 형성되어 있어 추격 매수 시 신중해야 합니다.")
-        else:
-            st.caption("※ 본 종목은 최근 ROE/BPS 결산 데이터 처리 중으로 S-RIM 적정주가가 자동 추정 계산 모드로 구동됩니다.")
-        st.markdown("---")
+            p1_budget = int(total_invest_budget * 0.30)
+            p2_budget = int(total_invest_budget * 0.40)
+            p3_budget = int(total_invest_budget * 0.30)
 
-        # ★ [기능 3] 3단계 기관식 분할 매수/매도 퀀트 계산기
-        st.markdown(f"### 🧮 기관 투자자식 [{search_name}] 3단계 분할 매수/매도 포트폴리오 스케줄")
-        ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else current_price * 0.97
-        ma60_val = float(last_row['MA60']) if pd.notna(last_row['MA60']) else current_price * 0.94
+            p1_qty = int(p1_budget / p1_price) if p1_price > 0 else 0
+            p2_qty = int(p2_budget / p2_price) if p2_price > 0 else 0
+            p3_qty = int(p3_budget / p3_price) if p3_price > 0 else 0
 
-        p1_price = int(current_price)
-        p2_price = int(ma20_val)
-        p3_price = int(ma60_val)
+            total_qty = p1_qty + p2_qty + p3_qty
+            total_used_money = (p1_qty * p1_price) + (p2_qty * p2_price) + (p3_qty * p3_price)
+            expected_avg_price = int(total_used_money / total_qty) if total_qty > 0 else user_buy_price
 
-        p1_budget = int(total_invest_budget * 0.30)
-        p2_budget = int(total_invest_budget * 0.40)
-        p3_budget = int(total_invest_budget * 0.30)
+            target_exit_price = int(expected_avg_price * 1.15)
+            stop_loss_price = int(expected_avg_price * 0.95)
 
-        p1_qty = int(p1_budget / p1_price) if p1_price > 0 else 0
-        p2_qty = int(p2_budget / p2_price) if p2_price > 0 else 0
-        p3_qty = int(p3_budget / p3_price) if p3_price > 0 else 0
+            plan_data = [
+                {"단계": "1차 대응 (30% 비중)", "매수/대응 매커니즘": "내 현재 평단가 기준", "목표가/타점": f"{p1_price:,.0f} 원", "배정 금액": f"{p1_budget:,.0f} 원", "매수 수량": f"{p1_qty:,} 주"},
+                {"단계": "2차 대응 (40% 비중)", "매수/대응 매커니즘": "20일선 눌림목 지지선", "목표가/타점": f"{p2_price:,.0f} 원", "배정 금액": f"{p2_budget:,.0f} 원", "매수 수량": f"{p2_qty:,} 주"},
+                {"단계": "3차 대응 (30% 비중)", "매수/대응 매커니즘": "60일선 콘크리트 바닥선", "목표가/타점": f"{p3_price:,.0f} 원", "배정 금액": f"{p3_budget:,.0f} 원", "매수 수량": f"{p3_qty:,} 주"},
+            ]
+            st.dataframe(pd.DataFrame(plan_data), use_container_width=True, hide_index=True)
 
-        total_qty = p1_qty + p2_qty + p3_qty
-        total_used_money = (p1_qty * p1_price) + (p2_qty * p2_price) + (p3_qty * p3_price)
-        expected_avg_price = int(total_used_money / total_qty) if total_qty > 0 else 0
-
-        target_exit_price = int(expected_avg_price * 1.15)
-        stop_loss_price = int(expected_avg_price * 0.95)
-
-        plan_data = [
-            {"단계": "1차 매수 (30% 비중)", "매수 매커니즘": "현재가 시초 진입", "목표 매수가": f"{p1_price:,.0f} 원", "배정 금액": f"{p1_budget:,.0f} 원", "매수 수량": f"{p1_qty:,} 주"},
-            {"단계": "2차 매수 (40% 비중)", "매수 매커니즘": "20일선 눌림목 지지선", "목표 매수가": f"{p2_price:,.0f} 원", "배정 금액": f"{p2_budget:,.0f} 원", "매수 수량": f"{p2_qty:,} 주"},
-            {"단계": "3차 매수 (30% 비중)", "매수 매커니즘": "60일선/S-RIM 바닥선", "목표 매수가": f"{p3_price:,.0f} 원", "배정 금액": f"{p3_budget:,.0f} 원", "매수 수량": f"{p3_qty:,} 주"},
-        ]
-        st.dataframe(pd.DataFrame(plan_data), use_container_width=True, hide_index=True)
-
-        q_col1, q_col2, q_col3 = st.columns(3)
-        q_col1.info(f"**📉 분할 매수 완결 시 예상 평단가:**\n### {expected_avg_price:,.0f} 원")
-        q_col2.success(f"**🎯 1차 권장 목표 익절가 (+15%):**\n### {target_exit_price:,.0f} 원")
-        q_col3.error(f"**🚨 최종 기계적 손절가 (-5%):**\n### {stop_loss_price:,.0f} 원")
-        st.markdown("---")
+            q_col1, q_col2, q_col3 = st.columns(3)
+            q_col1.info(f"**📉 분할 매수 완료 시 하향 평단가:**\n### {expected_avg_price:,.0f} 원")
+            q_col2.success(f"**🎯 1차 권장 목표 익절가 (+15%):**\n### {target_exit_price:,.0f} 원")
+            q_col3.error(f"**🚨 최종 기계적 손절가 (-5%):**\n### {stop_loss_price:,.0f} 원")
+            st.markdown("---")
 
         # 실시간 이슈 분석
         st.markdown(f"### 📰 {search_name} 실시간 이슈 분석")
@@ -500,14 +461,18 @@ if ticker_code:
         fig.update_layout(xaxis_rangeslider_visible=True, height=580, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
 
-        # 차트 직하단 수석 애널리스트 차트 정밀 분석 엔진
+        # 수석 애널리스트 차트 정밀 분석 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 정밀 패턴 및 수급 분석")
         
-        if current_price > ma20_val > ma60_val > ma120:
+        ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
+        ma60_val = float(last_row['MA60']) if pd.notna(last_row['MA60']) else 0
+        ma120_val = float(last_row['MA120']) if pd.notna(last_row['MA120']) else 0
+        
+        if current_price > ma20_val > ma60_val > ma120_val:
             trend_desc = "🟢 **정배열 상승 추세 (Strong Uptrend)**: 단기·중기·장기 이동평균선이 안정적인 정배열을 구축하여 강력한 우상향 모멘텀을 형성하고 있습니다."
-        elif current_price < ma20_val < ma60_val < ma120:
+        elif current_price < ma20_val < ma60_val < ma120_val:
             trend_desc = "🔴 **완전 역배열 (Downtrend)**: 주가가 주요 이동평균선 하단에 눌려 있어 단기 반등 시 차익 매물 압박이 상존하는 보수적 구간입니다."
-        elif current_price > ma120:
+        elif current_price > ma120_val:
             trend_desc = "🔵 **장기 우상향 박스권 (Consolidation above 120MA)**: 120일 경기선 상단에서 주가가 매물을 소화하며 하단 지지선을 탄탄히 다지는 에너지를 축적하고 있습니다."
         else:
             trend_desc = "🟡 **혼조세 및 반등 탐색 구간**: 이평선들이 수렴하며 단기 수급 방향성을 재탐색하는 국면입니다."
@@ -539,3 +504,52 @@ if ticker_code:
         * **[거래량 분석]** {vol_desc}
         * **[RSI 수급 심리]** 현재 심리지표는 **RSI {rsi_display}** 수준으로, {"과매도(침체) 구간에 도달하여 기술적 반등 타점이 임박했습니다." if rsi_val < 35 else ("단기 과열권에 진입하여 부분 차익실현을 고려할 구간입니다." if rsi_val > 70 else "과열이나 침체 없이 안정적인 수급 흐름을 보여주고 있습니다.")}
         """)
+
+        st.markdown("---")
+
+        # 4대 원칙 융합 5대 심층 분석 프롬프트 생성기 (탭 분리 구조)
+        st.markdown("### 🤖 수석 애널리스트 5대 심층 리서치 프롬프트 생성기")
+        st.caption("※ 회원님의 4대 분석 원칙이 자동 결합된 5가지 롤플레잉 프롬프트입니다. 원하는 탭을 선택하여 복사 후 사용하십시오.")
+
+        col_p1, col_p2, col_p3 = st.columns(3)
+        compare_name = col_p1.text_input("📊 비교 대상 종목", "SK하이닉스")
+        target_sector = col_p2.text_input("🌐 관심 섹터", "반도체/AI")
+        target_theme = col_p3.text_input("🚀 주도 테마", "SMR (소형모듈원전)")
+        
+        held_stock = st.text_input("💼 보유 포트폴리오 종목", "1Q S&P500")
+
+        master_prompt = """너는 20년 경력의 글로벌 자산운용사 수석 주식 애널리스트야. 아래 4가지 원칙을 반드시 지켜서 답해줘.
+1. 거대 자금을 운용해 온 전문가답게 신뢰감 있고 권위 있는 말투를 사용할 것
+2. 최근 6개월 이내의 데이터와 오늘 기준의 실시간 정보를 바탕으로 분석할 것
+3. 차트 중심의 기술적 분석과 기업 가치 중심의 기본적 분석을 함께 고려할 것
+4. 장점뿐 아니라 리스크도 충분히 설명하고, 어려운 용어는 초보자도 이해할 수 있게 일상적인 비유로 풀어줄 것
+
+---"""
+
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "① 뉴스 정밀 해부", 
+            "② 가치투자 비교", 
+            "③ 미 증시 브리핑", 
+            "④ 수급/차트 추적", 
+            "⑤ 구조적 주도주"
+        ])
+
+        with tab1:
+            p1 = f"{master_prompt}\n\n너는 냉철한 주식 시장 분석가야. 방금 나온 '{search_name}'의 뉴스 [여기에 뉴스 제목/내용 요약 입력]을 분석해 줘. 이 뉴스가 단기 및 중장기적으로 주가에 긍정적인지 부정적인지 판단하고, 그 핵심 이유를 3가지로 명확히 요약해 줘. 마지막으로 이 뉴스를 해석할 때 개인 투자자가 흔히 범할 수 있는 오류나 주의해야 할 리스크도 함께 짚어줘."
+            st.code(p1, language="markdown")
+
+        with tab2:
+            p2 = f"{master_prompt}\n\n너는 가치투자 전문가야. '{search_name}'와(과) '{compare_name}'를 비교 분석하려고 해. 두 회사의 최근 분기 기준 실적 추이와 PER, PBR, ROE, 영업이익률 수치를 표로 깔끔하게 정리해서 비교해 줘. 이를 바탕으로 현재 시점에서 어떤 종목이 더 저평가되어 매력적인지, 수익성 측면에서는 누가 더 우위에 있는지 투자 초보자도 이해하기 쉽게 설명해줘."
+            st.code(p2, language="markdown")
+
+        with tab3:
+            p3 = f"{master_prompt}\n\n어제 미국 증시에서 '{target_sector}' 지수와 주요 ETF의 흐름이 어땠는지 요약해 줘. 특히 글로벌 대장주(예: 엔비디아, 테슬라 등)와 관련된 최신 핵심 뉴스 중에서, 오늘 한국 시장의 '{held_stock}' 주가 흐름에 직접적인 영향을 줄 만한 요인만 3문장 이내로 짧고 강렬하게 브리핑해 줘."
+            st.code(p3, language="markdown")
+
+        with tab4:
+            p4 = f"{master_prompt}\n\n너는 글로벌 헤지펀드의 데이터 분석가야. 최근 한 달간 '{search_name}'에 대한 외국인과 기관의 누적 수급 동향을 기반으로 이들의 매매 패턴을 분석해 줘. 최근 발생한 대량 거래량을 동반한 매수/매도 주체가 누구인지 파악하고, 이것이 단기 차익 실현 성격인지 장기적 관점의 비중 확대인지 너의 논리적인 추론을 제시해 줘. 또한 향후 주가조정 시 강력한 지지선 역할을 할 가격대도 예측해 줘."
+            st.code(p4, language="markdown")
+
+        with tab5:
+            p5 = f"{master_prompt}\n\n너는 20년 경력의 톱티어 자산운용사 수석 애널리스트야. 2026년 현재의 금리 기조와 환율, 그리고 '{target_theme}' 산업의 구조적 변화를 종합적으로 반영해서 분석 리포트를 작성해 줘. 향후 6개월에서 1년간 주식 시장의 상승을 주도할 가장 유망한 세부 업종 3가지를 선정하고, 각 업종 내에서 기술력과 시장 점유율을 독점하고 있는 확실한 대장주를 하나씩 추천해 줘. 추천 근거는 구체적인 데이터나 예상 시나리오를 바탕으로 작성해."
+            st.code(p5, language="markdown")
