@@ -205,11 +205,15 @@ def get_market_top_trades():
         
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 8. 메인 UI 렌더링
+# 8. 사이드바 통합 검색 패널 및 매수가 입력
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 ticker_code = KOREA_TICKERS.get(search_name, "005930")
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
+
+st.sidebar.markdown("---")
+st.sidebar.header("💼 보유 주식 정밀 진단")
+user_buy_price = st.sidebar.number_input("내 평단가(매수가) 입력 (원)", value=0, step=100)
 
 if ticker_code:
     df = get_korea_stock_data(ticker_code)
@@ -246,6 +250,47 @@ if ticker_code:
         rsi_display = f"{rsi_val:.1f}" if pd.notna(rsi_val) else "분석 중"
         m4.metric("RSI (14) 심리지표", rsi_display)
         st.markdown("---")
+
+        # ★ [신규 추가] 내 보유 주식 평단가 기반 수석 애널리스트 정밀 진단 시스템
+        if user_buy_price > 0:
+            st.markdown(f"### 🎯 수석 애널리스트의 [{search_name}] 보유 포트폴리오 맞춤 솔루션")
+            profit_rate = ((current_price - user_buy_price) / user_buy_price) * 100
+            
+            p_col1, p_col2, p_col3 = st.columns(3)
+            p_col1.metric("내 평단가 대비 수익률", f"{profit_rate:+.2f}%", delta_color="normal")
+            
+            ma20_v = float(last_row['MA20']) if pd.notna(last_row['MA20']) else current_price
+            high60_v = df['High'].tail(60).max()
+            
+            p_col2.metric("1차 목표 익절가 (전고점)", f"{high60_v:,.0f} 원")
+            p_col3.metric("손절/비중축소 기준가 (20일선)", f"{ma20_v:,.0f} 원")
+
+            # 맞춤 조언 메시지 생성
+            if profit_rate >= 10.0:
+                st.success(f"""
+                🟢 **[수익 극대화 구간 | +{profit_rate:.2f}%]**
+                * **수석 애널리스트 조언**: 현재 훌륭한 수익을 거두고 계십니다. 주가가 전고점({high60_v:,.0f}원) 부근에 도달할 때 보유 물량의 30~50%를 1차 차익실현하여 현금을 확보하시는 것을 권장합니다.
+                * **트레일링 스탑**: 잔여 물량은 20일 이동평균선({ma20_v:,.0f}원)을 하향 이탈하지 않는 한 끝까지 추세 홀딩하여 수익을 극대화하십시오.
+                """)
+            elif 0 <= profit_rate < 10.0:
+                st.info(f"""
+                🔵 **[안정적 보유 구간 | +{profit_rate:.2f}%]**
+                * **수석 애널리스트 조언**: 평단가 대비 무난한 원금 보존 및 소폭 수익 상태입니다. 
+                * **대응 전략**: 20일선({ma20_v:,.0f}원) 지지력을 바탕으로 1차 목표가({high60_v:,.0f}원)까지 보유를 유지하십시오. 만약 주가가 내 평단가 이하로 밀릴 경우 손절보다는 60일선 지지를 확인한 후 재대응하는 것이 유리합니다.
+                """)
+            elif -10.0 < profit_rate < 0:
+                st.warning(f"""
+                🟡 **[단기 눌림목 구간 | {profit_rate:.2f}%]**
+                * **수석 애널리스트 조언**: 주가가 평단가보다 소폭 아래에 위치해 있습니다. 감정적인 뇌동매매는 자제하십시오.
+                * **물타기/추가매수 판단**: 현재 RSI 지표가 **{rsi_display}**로 {"과매도(35 미만) 구간이므로 20일선 지지 확인 시 분할 추가매수로 평단가를 낮추기 좋은 타점입니다." if rsi_val < 35 else "과매도 수준은 아니므로 추가 매수보다는 현금을 온전히 보존하며 반등 여부를 관망하십시오."}
+                """)
+            else:
+                st.error(f"""
+                🔴 **[위험 관리 및 손절 고려 구간 | {profit_rate:.2f}%]**
+                * **수석 애널리스트 조언**: 평단가 대비 -10% 이상 손실이 발생한 구조적 위험 구간입니다. 
+                * **리스크 관리**: 주가가 120일 경기선 하단에서 놀고 있다면 추가 물타기는 현금을 잠그는 원인이 됩니다. 반등 시 평단가 인근에서 비중을 대폭 줄이거나, 정해둔 손절 기준 라인을 기계적으로 준수하여 원금을 보호하십시오.
+                """)
+            st.markdown("---")
 
         # 실시간 이슈 분석
         st.markdown(f"### 📰 {search_name} 실시간 이슈 분석")
@@ -377,10 +422,9 @@ if ticker_code:
         fig.update_layout(xaxis_rangeslider_visible=True, height=580, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
 
-        # ★ [신규 탑재] 차트 직하단 수석 애널리스트 차트 정밀 분석 엔진
+        # 차트 직하단 수석 애널리스트 차트 정밀 분석 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 정밀 패턴 및 수급 분석")
         
-        # 1. 이동평균선 배열 및 추세 진단
         ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
         ma60_val = float(last_row['MA60']) if pd.notna(last_row['MA60']) else 0
         ma120_val = float(last_row['MA120']) if pd.notna(last_row['MA120']) else 0
@@ -394,7 +438,6 @@ if ticker_code:
         else:
             trend_desc = "🟡 **혼조세 및 반등 탐색 구간**: 이평선들이 수렴하며 단기 수급 방향성을 재탐색하는 국면입니다."
 
-        # 2. 거래량 비율 계산
         vol_5day = df['Volume'].tail(5).mean()
         vol_20day = df['Volume'].tail(20).mean()
         vol_ratio = (vol_5day / vol_20day * 100) if vol_20day > 0 else 100
@@ -406,7 +449,6 @@ if ticker_code:
         else:
             vol_desc = f"📊 **평년 수준 거래량 (평균 대비 {vol_ratio:.0f}%)**: 매물 이탈 없이 안정적인 거래 수급 밸런스를 유지하고 있습니다."
 
-        # 3. 주요 지지/저항 라인 산출
         high_60 = df['High'].tail(60).max()
         low_60 = df['Low'].tail(60).min()
         
