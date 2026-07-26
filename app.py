@@ -93,7 +93,7 @@ def get_naver_financial_metrics(ticker_code):
         pass
     return metrics
 
-# 5. PC/모바일 100% 호환 모바일 뉴스 반응형 파싱 엔진
+# 5. PC/모바일 100% 호환 모바일 뉴스 파싱 엔진
 def get_classified_news(ticker_code, search_name=""):
     news_data = {"기회": [], "중립": [], "위기": []}
     try:
@@ -205,16 +205,24 @@ def get_market_top_trades():
         
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 8. 사이드바 통합 검색 패널 및 매수가 입력
+# 8. 사이드바 통합 검색 패널 및 3단계 매수가/투자금 직접 입력
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 ticker_code = KOREA_TICKERS.get(search_name, "005930")
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
 st.sidebar.markdown("---")
-st.sidebar.header("💼 보유 주식 정밀 진단 및 퀀트 분할 매수")
-user_buy_price = st.sidebar.number_input("내 평단가(매수가) 입력 (원)", value=0, step=100)
-total_invest_budget = st.sidebar.number_input("추가/신규 투자 예정 금액 (원)", value=10000000, step=1000000)
+st.sidebar.header("💼 내 평단가 및 3단계 분할 단가 설정")
+user_buy_price = st.sidebar.number_input("내 현재 평단가/1차 매수가 (원)", value=70000, step=500)
+
+st.sidebar.subheader("🎯 분할 매수 예정 단가 직접 입력")
+target_p2 = st.sidebar.number_input("2차 눌림목 목표 단가 (원)", value=int(user_buy_price * 0.95), step=500)
+target_p3 = st.sidebar.number_input("3차 바닥선 목표 단가 (원)", value=int(user_buy_price * 0.90), step=500)
+
+st.sidebar.subheader("💰 단계별 투입 예산 (원)")
+budget_p1 = st.sidebar.number_input("1차 투입 예산 (원)", value=3000000, step=500000)
+budget_p2 = st.sidebar.number_input("2차 투입 예산 (원)", value=4000000, step=500000)
+budget_p3 = st.sidebar.number_input("3차 투입 예산 (원)", value=3000000, step=500000)
 
 if ticker_code:
     df = get_korea_stock_data(ticker_code)
@@ -252,7 +260,7 @@ if ticker_code:
         m4.metric("RSI (14) 심리지표", rsi_display)
         st.markdown("---")
 
-        # 내 보유 주식 평단가 기반 수석 애널리스트 정밀 진단 시스템
+        # 보유 주식 진단
         if user_buy_price > 0:
             st.markdown(f"### 🎯 수석 애널리스트의 [{search_name}] 보유 포트폴리오 맞춤 솔루션")
             profit_rate = ((current_price - user_buy_price) / user_buy_price) * 100
@@ -267,68 +275,44 @@ if ticker_code:
             p_col3.metric("손절/비중축소 기준가 (20일선)", f"{ma20_v:,.0f} 원")
 
             if profit_rate >= 10.0:
-                st.success(f"""
-                🟢 **[수익 극대화 구간 | +{profit_rate:.2f}%]**
-                * **수석 애널리스트 조언**: 현재 훌륭한 수익을 거두고 계십니다. 주가가 전고점({high60_v:,.0f}원) 부근에 도달할 때 보유 물량의 30~50%를 1차 차익실현하여 현금을 확보하시는 것을 권장합니다.
-                * **트레일링 스탑**: 잔여 물량은 20일 이동평균선({ma20_v:,.0f}원)을 하향 이탈하지 않는 한 끝까지 추세 홀딩하여 수익을 극대화하십시오.
-                """)
+                st.success(f"🟢 **[수익 극대화 구간 | +{profit_rate:.2f}%]**: 현재 훌륭한 수익을 거두고 계십니다. 전고점({high60_v:,.0f}원) 부근 도달 시 30~50% 1차 차익실현을 권장합니다.")
             elif 0 <= profit_rate < 10.0:
-                st.info(f"""
-                🔵 **[안정적 보유 구간 | +{profit_rate:.2f}%]**
-                * **수석 애널리스트 조언**: 평단가 대비 무난한 원금 보존 및 소폭 수익 상태입니다. 
-                * **대응 전략**: 20일선({ma20_v:,.0f}원) 지지력을 바탕으로 1차 목표가({high60_v:,.0f}원)까지 보유를 유지하십시오. 만약 주가가 내 평단가 이하로 밀릴 경우 손절보다는 60일선 지지를 확인한 후 재대응하는 것이 유리합니다.
-                """)
+                st.info(f"🔵 **[안정적 보유 구간 | +{profit_rate:.2f}%]**: 무난한 수익 상태입니다. 20일선({ma20_v:,.0f}원) 지지력을 바탕으로 홀딩을 유지하십시오.")
             elif -10.0 < profit_rate < 0:
-                st.warning(f"""
-                🟡 **[단기 눌림목 구간 | {profit_rate:.2f}%]**
-                * **수석 애널리스트 조언**: 주가가 평단가보다 소폭 아래에 위치해 있습니다. 감정적인 뇌동매매는 자제하십시오.
-                * **물타기/추가매수 판단**: 현재 RSI 지표가 **{rsi_display}**로 {"과매도(35 미만) 구간이므로 20일선 지지 확인 시 분할 추가매수로 평단가를 낮추기 좋은 타점입니다." if rsi_val < 35 else "과매도 수준은 아니므로 추가 매수보다는 현금을 온전히 보존하며 반등 여부를 관망하십시오."}
-                """)
+                st.warning(f"🟡 **[단기 눌림목 구간 | {profit_rate:.2f}%]**: 주가가 평단가보다 소폭 아래입니다. 감정적 뇌동매매를 자제하고 분할 매수 스케줄을 활용하십시오.")
             else:
-                st.error(f"""
-                🔴 **[위험 관리 및 손절 고려 구간 | {profit_rate:.2f}%]**
-                * **수석 애널리스트 조언**: 평단가 대비 -10% 이상 손실이 발생한 구조적 위험 구간입니다. 
-                * **리스크 관리**: 주가가 120일 경기선 하단에서 놀고 있다면 추가 물타기는 현금을 잠그는 원인이 됩니다. 반등 시 평단가 인근에서 비중을 대폭 줄이거나, 정해둔 손절 기준 라인을 기계적으로 준수하여 원금을 보호하십시오.
-                """)
+                st.error(f"🔴 **[위험 관리 구간 | {profit_rate:.2f}%]**: 평단가 대비 -10% 이상 손실 구간입니다. 정해둔 손절 라인을 기계적으로 준수하십시오.")
             st.markdown("---")
 
-            # ★ [입력 단가 직접 연동] 기관 투자자식 3단계 분할 매수/매도 포트폴리오 스케줄
-            st.markdown(f"### 🧮 기관 투자자식 [{search_name}] 3단계 분할 매수/매도 포트폴리오 스케줄")
-            st.caption("※ 사이드바에서 입력하신 **내 평단가(매수가)**를 기준 베이스로 계산된 분할 대응표입니다.")
+            # ★ [직접 입력 단가 기반] 기관 투자자식 3단계 분할 매수/매도 정밀 계산기
+            st.markdown(f"### 🧮 기관 투자자식 [{search_name}] 3단계 분할 매수/매도 정밀 포트폴리오 스케줄")
+            st.caption("※ 사이드바에서 입력하신 **목표 단가 및 투입 예산**으로 100% 정밀 계산된 스케줄표입니다.")
 
-            ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else user_buy_price * 0.97
-            ma60_val = float(last_row['MA60']) if pd.notna(last_row['MA60']) else user_buy_price * 0.93
+            # 수량 계산
+            q1 = int(budget_p1 / user_buy_price) if user_buy_price > 0 else 0
+            q2 = int(budget_p2 / target_p2) if target_p2 > 0 else 0
+            q3 = int(budget_p3 / target_p3) if target_p3 > 0 else 0
 
-            p1_price = int(user_buy_price)
-            p2_price = int(ma20_val)
-            p3_price = int(ma60_val)
+            tot_qty = q1 + q2 + q3
+            tot_spent = (q1 * user_buy_price) + (q2 * target_p2) + (q3 * target_p3)
+            
+            # 분할 매수 완결 시 하향 평단가 정밀 계산
+            exact_avg_price = int(tot_spent / tot_qty) if tot_qty > 0 else user_buy_price
 
-            p1_budget = int(total_invest_budget * 0.30)
-            p2_budget = int(total_invest_budget * 0.40)
-            p3_budget = int(total_invest_budget * 0.30)
+            calc_target_exit = int(exact_avg_price * 1.15) # +15% 목표가
+            calc_stop_loss = int(exact_avg_price * 0.95)   # -5% 손절가
 
-            p1_qty = int(p1_budget / p1_price) if p1_price > 0 else 0
-            p2_qty = int(p2_budget / p2_price) if p2_price > 0 else 0
-            p3_qty = int(p3_budget / p3_price) if p3_price > 0 else 0
-
-            total_qty = p1_qty + p2_qty + p3_qty
-            total_used_money = (p1_qty * p1_price) + (p2_qty * p2_price) + (p3_qty * p3_price)
-            expected_avg_price = int(total_used_money / total_qty) if total_qty > 0 else user_buy_price
-
-            target_exit_price = int(expected_avg_price * 1.15)
-            stop_loss_price = int(expected_avg_price * 0.95)
-
-            plan_data = [
-                {"단계": "1차 대응 (30% 비중)", "매수/대응 매커니즘": "내 현재 평단가 기준", "목표가/타점": f"{p1_price:,.0f} 원", "배정 금액": f"{p1_budget:,.0f} 원", "매수 수량": f"{p1_qty:,} 주"},
-                {"단계": "2차 대응 (40% 비중)", "매수/대응 매커니즘": "20일선 눌림목 지지선", "목표가/타점": f"{p2_price:,.0f} 원", "배정 금액": f"{p2_budget:,.0f} 원", "매수 수량": f"{p2_qty:,} 주"},
-                {"단계": "3차 대응 (30% 비중)", "매수/대응 매커니즘": "60일선 콘크리트 바닥선", "목표가/타점": f"{p3_price:,.0f} 원", "배정 금액": f"{p3_budget:,.0f} 원", "매수 수량": f"{p3_qty:,} 주"},
-            ]
-            st.dataframe(pd.DataFrame(plan_data), use_container_width=True, hide_index=True)
+            schedule_df = pd.DataFrame([
+                {"단계": "1차 대응", "구분/매커니즘": "현재 평단가 / 1차 진입", "지정 매수 단가": f"{user_buy_price:,.0f} 원", "배정 예산": f"{budget_p1:,.0f} 원", "체결 수량": f"{q1:,} 주"},
+                {"단계": "2차 대응", "구분/매커니즘": "2차 눌림목 타점", "지정 매수 단가": f"{target_p2:,.0f} 원", "배정 예산": f"{budget_p2:,.0f} 원", "체결 수량": f"{q2:,} 주"},
+                {"단계": "3차 대응", "구분/매커니즘": "3차 바닥 지지선", "지정 매수 단가": f"{target_p3:,.0f} 원", "배정 예산": f"{budget_p3:,.0f} 원", "체결 수량": f"{q3:,} 주"},
+            ])
+            st.dataframe(schedule_df, use_container_width=True, hide_index=True)
 
             q_col1, q_col2, q_col3 = st.columns(3)
-            q_col1.info(f"**📉 분할 매수 완료 시 하향 평단가:**\n### {expected_avg_price:,.0f} 원")
-            q_col2.success(f"**🎯 1차 권장 목표 익절가 (+15%):**\n### {target_exit_price:,.0f} 원")
-            q_col3.error(f"**🚨 최종 기계적 손절가 (-5%):**\n### {stop_loss_price:,.0f} 원")
+            q_col1.info(f"**📉 3단계 완료 시 최종 예상 평단가:**\n### {exact_avg_price:,.0f} 원")
+            q_col2.success(f"**🎯 1차 권장 목표 익절가 (+15%):**\n### {calc_target_exit:,.0f} 원")
+            q_col3.error(f"**🚨 최종 기계적 손절가 (-5%):**\n### {calc_stop_loss:,.0f} 원")
             st.markdown("---")
 
         # 실시간 이슈 분석
@@ -461,7 +445,7 @@ if ticker_code:
         fig.update_layout(xaxis_rangeslider_visible=True, height=580, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
 
-        # 수석 애널리스트 차트 정밀 분석 엔진
+        # 차트 직하단 수석 애널리스트 차트 정밀 분석 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 정밀 패턴 및 수급 분석")
         
         ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
