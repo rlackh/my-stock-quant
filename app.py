@@ -251,7 +251,7 @@ if ticker_code:
         m4.metric("RSI (14) 심리지표", rsi_display)
         st.markdown("---")
 
-        # ★ [신규 추가] 내 보유 주식 평단가 기반 수석 애널리스트 정밀 진단 시스템
+        # 내 보유 주식 평단가 기반 수석 애널리스트 정밀 진단 시스템
         if user_buy_price > 0:
             st.markdown(f"### 🎯 수석 애널리스트의 [{search_name}] 보유 포트폴리오 맞춤 솔루션")
             profit_rate = ((current_price - user_buy_price) / user_buy_price) * 100
@@ -265,7 +265,6 @@ if ticker_code:
             p_col2.metric("1차 목표 익절가 (전고점)", f"{high60_v:,.0f} 원")
             p_col3.metric("손절/비중축소 기준가 (20일선)", f"{ma20_v:,.0f} 원")
 
-            # 맞춤 조언 메시지 생성
             if profit_rate >= 10.0:
                 st.success(f"""
                 🟢 **[수익 극대화 구간 | +{profit_rate:.2f}%]**
@@ -422,7 +421,7 @@ if ticker_code:
         fig.update_layout(xaxis_rangeslider_visible=True, height=580, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig, use_container_width=True)
 
-        # 차트 직하단 수석 애널리스트 차트 정밀 분석 엔진
+        # 수석 애널리스트 차트 정밀 분석 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 정밀 패턴 및 수급 분석")
         
         ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
@@ -465,3 +464,55 @@ if ticker_code:
         * **[거래량 분석]** {vol_desc}
         * **[RSI 수급 심리]** 현재 심리지표는 **RSI {rsi_display}** 수준으로, {"과매도(침체) 구간에 도달하여 기술적 반등 타점이 임박했습니다." if rsi_val < 35 else ("단기 과열권에 진입하여 부분 차익실현을 고려할 구간입니다." if rsi_val > 70 else "과열이나 침체 없이 안정적인 수급 흐름을 보여주고 있습니다.")}
         """)
+
+        st.markdown("---")
+
+        # ★ [4대 원칙 융합 5대 심층 분석 프롬프트 생성기 (탭 분리 적용)]
+        st.markdown("### 🤖 수석 애널리스트 5대 심층 리서치 프롬프트 생성기")
+        st.caption("※ 회원님의 4대 분석 원칙이 자동 결합된 5가지 롤플레잉 프롬프트입니다. 원하는 탭을 선택하여 복사 후 사용하십시오.")
+
+        # 입력 변수 파라미터
+        col_p1, col_p2, col_p3 = st.columns(3)
+        compare_name = col_p1.text_input("📊 비교 대상 종목", "SK하이닉스")
+        target_sector = col_p2.text_input("🌐 관심 섹터", "반도체/AI")
+        target_theme = col_p3.text_input("🚀 주도 테마", "SMR (소형모듈원전)")
+        
+        held_stock = st.text_input("💼 보유 포트폴리오 종목", "1Q S&P500")
+
+        # 4대 절대 원칙 마스터 베이스
+        master_prompt = """너는 20년 경력의 글로벌 자산운용사 수석 주식 애널리스트야. 아래 4가지 원칙을 반드시 지켜서 답해줘.
+1. 거대 자금을 운용해 온 전문가답게 신뢰감 있고 권위 있는 말투를 사용할 것
+2. 최근 6개월 이내의 데이터와 오늘 기준의 실시간 정보를 바탕으로 분석할 것
+3. 차트 중심의 기술적 분석과 기업 가치 중심의 기본적 분석을 함께 고려할 것
+4. 장점뿐 아니라 리스크도 충분히 설명하고, 어려운 용어는 초보자도 이해할 수 있게 일상적인 비유로 풀어줄 것
+
+---"""
+
+        # 5개 탭 분리 생성
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "① 뉴스 정밀 해부", 
+            "② 가치투자 비교", 
+            "③ 미 증시 브리핑", 
+            "④ 수급/차트 추적", 
+            "⑤ 구조적 주도주"
+        ])
+
+        with tab1:
+            p1 = f"{master_prompt}\n\n너는 냉철한 주식 시장 분석가야. 방금 나온 '{search_name}'의 뉴스 [여기에 뉴스 제목/내용 요약 입력]을 분석해 줘. 이 뉴스가 단기 및 중장기적으로 주가에 긍정적인지 부정적인지 판단하고, 그 핵심 이유를 3가지로 명확히 요약해 줘. 마지막으로 이 뉴스를 해석할 때 개인 투자자가 흔히 범할 수 있는 오류나 주의해야 할 리스크도 함께 짚어줘."
+            st.code(p1, language="markdown")
+
+        with tab2:
+            p2 = f"{master_prompt}\n\n너는 가치투자 전문가야. '{search_name}'와(과) '{compare_name}'를 비교 분석하려고 해. 두 회사의 최근 분기 기준 실적 추이와 PER, PBR, ROE, 영업이익률 수치를 표로 깔끔하게 정리해서 비교해 줘. 이를 바탕으로 현재 시점에서 어떤 종목이 더 저평가되어 매력적인지, 수익성 측면에서는 누가 더 우위에 있는지 투자 초보자도 이해하기 쉽게 설명해줘."
+            st.code(p2, language="markdown")
+
+        with tab3:
+            p3 = f"{master_prompt}\n\n어제 미국 증시에서 '{target_sector}' 지수와 주요 ETF의 흐름이 어땠는지 요약해 줘. 특히 글로벌 대장주(예: 엔비디아, 테슬라 등)와 관련된 최신 핵심 뉴스 중에서, 오늘 한국 시장의 '{held_stock}' 주가 흐름에 직접적인 영향을 줄 만한 요인만 3문장 이내로 짧고 강렬하게 브리핑해 줘."
+            st.code(p3, language="markdown")
+
+        with tab4:
+            p4 = f"{master_prompt}\n\n너는 글로벌 헤지펀드의 데이터 분석가야. 최근 한 달간 '{search_name}'에 대한 외국인과 기관의 누적 수급 동향을 기반으로 이들의 매매 패턴을 분석해 줘. 최근 발생한 대량 거래량을 동반한 매수/매도 주체가 누구인지 파악하고, 이것이 단기 차익 실현 성격인지 장기적 관점의 비중 확대인지 너의 논리적인 추론을 제시해 줘. 또한 향후 주가조정 시 강력한 지지선 역할을 할 가격대도 예측해 줘."
+            st.code(p4, language="markdown")
+
+        with tab5:
+            p5 = f"{master_prompt}\n\n너는 20년 경력의 톱티어 자산운용사 수석 애널리스트야. 2026년 현재의 금리 기조와 환율, 그리고 '{target_theme}' 산업의 구조적 변화를 종합적으로 반영해서 분석 리포트를 작성해 줘. 향후 6개월에서 1년간 주식 시장의 상승을 주도할 가장 유망한 세부 업종 3가지를 선정하고, 각 업종 내에서 기술력과 시장 점유율을 독점하고 있는 확실한 대장주를 하나씩 추천해 줘. 추천 근거는 구체적인 데이터나 예상 시나리오를 바탕으로 작성해."
+            st.code(p5, language="markdown")
