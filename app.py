@@ -395,9 +395,9 @@ if ticker_code:
 
         st.markdown("---")
 
-        # ★ [수정 완료] 스마트 확장 및 고해상도 확대 호환 반응형 주가/거래량 차트
+        # ★ [수정 완료] 거래량 축 표기법(k, M 제거) 원/주 단위 천단위 구분기호 지정 차트
         st.markdown("### 📈 주가 기술적 분석 차트 (과거 4년 장기 추세 및 거래량)")
-        st.caption("🔍 **차트 확대 팁**: 차트 하단 레인지 슬라이더를 드래그하거나 손가락 핀치 줌으로 확대하시면 Y축 단가가 실시간 자동 스케일링되어 선명하게 표출됩니다.")
+        st.caption("🔍 **차트 단위 교정 완료**: 거래량 축 표기가 영문 약어(k, M) 대신 **100,000주 단위(천단위 쉼표)**로 표출됩니다.")
 
         fig = make_subplots(
             rows=2, cols=1, 
@@ -417,8 +417,11 @@ if ticker_code:
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
         
-        # 거래량 차트
-        fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
+        # 거래량 차트 (툴팁 포맷 및 단위 지정)
+        fig.add_trace(go.Bar(
+            x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray',
+            hovertemplate="일자: %{x}<br>거래량: %{y:,.0f}주<extra></extra>"
+        ), row=2, col=1)
         
         # 확대 시 축 찌그러짐 방지 및 Y축 자동 줌(Autoscale) 레이아웃 적용
         fig.update_layout(
@@ -429,9 +432,11 @@ if ticker_code:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         
-        # 확대 시 Y축 가격이 자동 맞춤되도록 설정
-        fig.update_yaxes(autorange=True, fixedrange=False, row=1, col=1)
-        fig.update_yaxes(autorange=True, fixedrange=False, row=2, col=1)
+        # 주가 Y축 포맷팅 (원 단위 쉼표 표기)
+        fig.update_yaxes(tickformat=",d", autorange=True, fixedrange=False, row=1, col=1)
+        
+        # ★ [핵심 교정] 거래량 Y축 포맷팅 (k, M 표기 제거 및 천단위 쉼표 적용)
+        fig.update_yaxes(tickformat=",d", autorange=True, fixedrange=False, row=2, col=1)
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -466,18 +471,18 @@ if ticker_code:
         vol_ratio = (vol_5day / vol_20day * 100) if vol_20day > 0 else 100
         
         if avg_up_vol > avg_down_vol * 1.2:
-            vol_flow_desc = "🔥 **스마트 머니 매집(Accumulation) 강세**: 최근 20일간 상승한 날의 평균 거래량이 하락한 날보다 우세하여, 메이저 세력이 물량을 아래에서 조용히 매집 중인 긍정적 수급 파동입니다."
+            vol_flow_desc = f"🔥 **스마트 머니 매집(Accumulation) 강세**: 최근 20일간 상승일 평균 거래량({avg_up_vol:,.0f}주)이 하락일({avg_down_vol:,.0f}주)보다 우세하여, 메이저 세력이 물량을 아래에서 조용히 매집 중인 긍정적 수급 파동입니다."
         elif avg_down_vol > avg_up_vol * 1.2:
-            vol_flow_desc = "⚠️ **차익 매물 출회(Distribution) 주의**: 하락한 날의 거래 수량이 상대적으로 많아 단기 차익 실현 매물이 시장에 공급되고 있습니다."
+            vol_flow_desc = f"⚠️ **차익 매물 출회(Distribution) 주의**: 최근 20일간 하락일 평균 거래량({avg_down_vol:,.0f}주)이 상승일({avg_up_vol:,.0f}주)보다 많아 단기 차익 실현 매물이 시장에 공급되고 있습니다."
         else:
             vol_flow_desc = "📊 **균형 잡힌 수급 공방**: 상승일과 하락일의 거래량 밸런스가 균등하여 팽팽한 수급 겨루기가 진행되고 있습니다."
 
         # 3. 거래량 돌파 판독
         last_vol = float(last_row['Volume'])
         if last_vol >= vol_20day * 1.5 and current_price > ma20_val:
-            breakout_desc = "⚡ **[거래량 분출 돌파]** 당일 거래량이 20일 평균의 150% 이상 폭발하며 20일 이동평균선 상단을 강력하게 돌파했습니다. 수급이 실린 진성 신호입니다."
+            breakout_desc = f"⚡ **[거래량 분출 돌파]** 당일 거래량({last_vol:,.0f}주)이 20일 평균의 150% 이상 폭발하며 20일 이동평균선 상단을 강력하게 돌파했습니다. 수급이 실린 진성 신호입니다."
         else:
-            breakout_desc = f"현 거래량은 20일 평균 대비 **{vol_ratio:.0f}%** 수준으로 무난한 거래 흐름을 보이고 있습니다."
+            breakout_desc = f"현 거래량({last_vol:,.0f}주)은 20일 평균 대비 **{vol_ratio:.0f}%** 수준으로 무난한 거래 흐름을 보이고 있습니다."
 
         high_60 = df['High'].tail(60).max()
         low_60 = df['Low'].tail(60).min()
