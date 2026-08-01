@@ -226,6 +226,7 @@ if ticker_code:
         df['MA20'] = df['Close'].rolling(window=min(20, len(df)), min_periods=1).mean()
         df['MA60'] = df['Close'].rolling(window=min(60, len(df)), min_periods=1).mean()
         df['MA120'] = df['Close'].rolling(window=min(120, len(df)), min_periods=1).mean()
+        df['Vol_MA20'] = df['Volume'].rolling(window=min(20, len(df)), min_periods=1).mean()
 
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
@@ -337,7 +338,7 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 퀀트 매수의견 점수 산출 상세 근거 정밀 출력
+        # 퀀트 매수의 의견 점수 산출 상세 근거 정밀 출력
         st.markdown("### ⚡ 수석 애널리스트 퀀트 매수의견 및 종합 시그널")
         score = 0
         reasons = []
@@ -395,50 +396,52 @@ if ticker_code:
 
         st.markdown("---")
 
-        # ★ [수정 완료] 거래량 축 표기법(k, M 제거) 원/주 단위 천단위 구분기호 지정 차트
-        st.markdown("### 📈 주가 기술적 분석 차트 (과거 4년 장기 추세 및 거래량)")
-        st.caption("🔍 **차트 단위 교정 완료**: 거래량 축 표기가 영문 약어(k, M) 대신 **100,000주 단위(천단위 쉼표)**로 표출됩니다.")
-
-        fig = make_subplots(
-            rows=2, cols=1, 
-            shared_xaxes=True, 
-            vertical_spacing=0.06, 
-            row_heights=[0.7, 0.3]
-        )
+        # 1. 메인 캔들스틱 주가 차트
+        st.markdown("### 📈 1. 주가 기술적 분석 차트 (과거 4년 장기 추세 및 이평선 파동)")
+        fig_price = go.Figure()
         
-        # 캔들스틱 차트
-        fig.add_trace(go.Candlestick(
+        fig_price.add_trace(go.Candlestick(
             x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
             name="주가", increasing_line_color='red', decreasing_line_color='blue'
-        ), row=1, col=1)
+        ))
+        fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"))
+        fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"))
+        fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"))
         
-        # 이동평균선
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
-        
-        # 거래량 차트 (툴팁 포맷 및 단위 지정)
-        fig.add_trace(go.Bar(
-            x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray',
-            hovertemplate="일자: %{x}<br>거래량: %{y:,.0f}주<extra></extra>"
-        ), row=2, col=1)
-        
-        # 확대 시 축 찌그러짐 방지 및 Y축 자동 줌(Autoscale) 레이아웃 적용
-        fig.update_layout(
-            height=650,
-            margin=dict(t=20, b=20, l=10, r=10),
-            xaxis_rangeslider_visible=True,
-            hovermode="x unified",
+        fig_price.update_layout(
+            height=480, margin=dict(t=10, b=10, l=10, r=10),
+            xaxis_rangeslider_visible=False, hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        
-        # 주가 Y축 포맷팅 (원 단위 쉼표 표기)
-        fig.update_yaxes(tickformat=",d", autorange=True, fixedrange=False, row=1, col=1)
-        
-        # ★ [핵심 교정] 거래량 Y축 포맷팅 (k, M 표기 제거 및 천단위 쉼표 적용)
-        fig.update_yaxes(tickformat=",d", autorange=True, fixedrange=False, row=2, col=1)
+        fig_price.update_yaxes(tickformat=",d", autorange=True, fixedrange=False)
+        st.plotly_chart(fig_price, use_container_width=True)
 
-        st.plotly_chart(fig, use_container_width=True)
+        # ★ 2. 순수 거래량 단독 차트 (수정 완결)
+        st.markdown("### 📊 2. 수급 에너지 거래량 단독 차트 (과거 4년 거래량 파동 및 20일 이동평균)")
+        st.caption("🔍 **단독 거래량 지표**: 캔들 간섭 없이 오직 수급 에너지의 분출과 감소 파동만을 전용으로 분석하는 차트입니다.")
+
+        fig_vol = go.Figure()
+        
+        # 거래량 막대
+        fig_vol.add_trace(go.Bar(
+            x=df['Date'], y=df['Volume'], name="일간 거래량", marker_color='gray',
+            hovertemplate="일자: %{x}<br>거래량: %{y:,.0f}주<extra></extra>"
+        ))
+        
+        # 20일 거래량 이동평균선
+        fig_vol.add_trace(go.Scatter(
+            x=df['Date'], y=df['Vol_MA20'], line=dict(color='red', width=2), name="20일 거래량 평균선",
+            hovertemplate="20일 평균 거래량: %{y:,.0f}주<extra></extra>"
+        ))
+
+        fig_vol.update_layout(
+            height=320, margin=dict(t=10, b=10, l=10, r=10),
+            xaxis_rangeslider_visible=True, hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        # k/M 영문 단위 제거 및 쉼표(천단위) 지정
+        fig_vol.update_yaxes(tickformat=",d", autorange=True, fixedrange=False)
+        st.plotly_chart(fig_vol, use_container_width=True)
 
         # 차트 X 거래량(수급) 정밀 연계 분석 퀀트 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 × 거래량(수급 에너지) 정밀 연계 분석")
