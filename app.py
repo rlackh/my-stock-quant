@@ -205,36 +205,16 @@ def get_market_top_trades():
         
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
 
-# 8. 내 보유평단가 및 1차, 2차, 3차 매수 설정 구조 개편
+# 8. 사이드바 통합 검색 패널 및 내 보유 평단가 입력 (분할 매수 세팅 제거 완료)
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
 ticker_code = KOREA_TICKERS.get(search_name, "005930")
 st.sidebar.success(f"📊 자산 매핑 성공: {search_name} ({ticker_code})")
 
 st.sidebar.markdown("---")
-st.sidebar.header("💼 내 평단가 및 3단계 분할 전략 설정")
-
-# 보유 평단가 독립 입력
+st.sidebar.header("💼 내 보유 평단가 정밀 진단")
 user_buy_price = st.sidebar.number_input("내 보유 평단가 (원)", value=70000, step=500)
-st.sidebar.info(f"📌 **현재 보유 평단가:** {user_buy_price:,.0f}원")
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎯 1차, 2차, 3차 분할 매수 세팅")
-
-# 1차 매수 설정
-target_p1 = st.sidebar.number_input("1차 매수 지정 단가 (원)", value=int(user_buy_price), step=500)
-budget_p1 = st.sidebar.number_input("1차 매수 투입 금액 (원)", value=3000000, step=500000)
-st.sidebar.info(f"✅ **1차 매수:** {target_p1:,.0f}원 / {budget_p1:,.0f}원")
-
-# 2차 매수 설정
-target_p2 = st.sidebar.number_input("2차 매수 지정 단가 (원)", value=int(user_buy_price * 0.95), step=500)
-budget_p2 = st.sidebar.number_input("2차 매수 투입 금액 (원)", value=4000000, step=500000)
-st.sidebar.info(f"✅ **2차 매수:** {target_p2:,.0f}원 / {budget_p2:,.0f}원")
-
-# 3차 매수 설정
-target_p3 = st.sidebar.number_input("3차 매수 지정 단가 (원)", value=int(user_buy_price * 0.90), step=500)
-budget_p3 = st.sidebar.number_input("3차 매수 투입 금액 (원)", value=3000000, step=500000)
-st.sidebar.info(f"✅ **3차 매수:** {target_p3:,.0f}원 / {budget_p3:,.0f}원")
+st.sidebar.info(f"📌 **현재 입력 평단가:** {user_buy_price:,.0f}원")
 
 # 메인 UI 렌더링
 if ticker_code:
@@ -273,7 +253,7 @@ if ticker_code:
         m4.metric("RSI (14) 심리지표", rsi_display)
         st.markdown("---")
 
-        # 내 보유 주식 진단
+        # 내 보유 주식 평단가 솔루션
         if user_buy_price > 0:
             st.markdown(f"### 🎯 수석 애널리스트의 [{search_name}] 보유 포트폴리오 맞춤 솔루션")
             profit_rate = ((current_price - user_buy_price) / user_buy_price) * 100
@@ -292,64 +272,9 @@ if ticker_code:
             elif 0 <= profit_rate < 10.0:
                 st.info(f"🔵 **[안정적 보유 구간 | +{profit_rate:.2f}%]**: 무난한 수익 상태입니다. 20일선({ma20_v:,.0f}원) 지지력을 바탕으로 홀딩을 유지하십시오.")
             elif -10.0 < profit_rate < 0:
-                st.warning(f"🟡 **[단기 눌림목 구간 | {profit_rate:.2f}%]**: 주가가 평단가보다 소폭 아래입니다. 감정적 뇌동매매를 자제하고 하단 분할 매수 스케줄을 활용하십시오.")
+                st.warning(f"🟡 **[단기 눌림목 구간 | {profit_rate:.2f}%]**: 주가가 평단가보다 소폭 아래입니다. 감정적 뇌동매매를 자제하고 하단 이동평균선 지지를 확인하십시오.")
             else:
                 st.error(f"🔴 **[위험 관리 구간 | {profit_rate:.2f}%]**: 평단가 대비 -10% 이상 손실 구간입니다. 정해둔 손절 라인을 기계적으로 준수하십시오.")
-            st.markdown("---")
-
-            # 1차, 2차, 3차 분할 매수 스케줄 표
-            st.markdown(f"### 🧮 기관 투자자식 [{search_name}] 1차, 2차, 3차 분할 매수 스케줄 및 예상 평단가")
-            st.caption("※ 입력하신 지정 단가 및 예산에 따라 각 차수별 체결 후 낮아지는 **누적 평단가(Rolling Average)**를 계산합니다.")
-
-            # 수량 및 누적 평단가 정밀 연산
-            q1 = int(budget_p1 / target_p1) if target_p1 > 0 else 0
-            spent_1 = q1 * target_p1
-            avg_1 = target_p1
-
-            q2 = int(budget_p2 / target_p2) if target_p2 > 0 else 0
-            spent_2 = q2 * target_p2
-            tot_qty_2 = q1 + q2
-            tot_spent_2 = spent_1 + spent_2
-            avg_2 = int(tot_spent_2 / tot_qty_2) if tot_qty_2 > 0 else avg_1
-
-            q3 = int(budget_p3 / target_p3) if target_p3 > 0 else 0
-            spent_3 = q3 * target_p3
-            tot_qty_3 = q1 + q2 + q3
-            tot_spent_3 = spent_1 + spent_2 + spent_3
-            avg_3 = int(tot_spent_3 / tot_qty_3) if tot_qty_3 > 0 else avg_2
-
-            calc_target_exit = int(avg_3 * 1.15) # +15% 목표 익절가
-            calc_stop_loss = int(avg_3 * 0.95)   # -5% 손절가
-
-            schedule_df = pd.DataFrame([
-                {
-                    "분할 단계": "1차 매수",
-                    "지정 매수 단가": f"{target_p1:,.0f} 원",
-                    "차수별 집행 예산": f"{spent_1:,.0f} 원",
-                    "체결 수량": f"{q1:,} 주",
-                    "★ 체결 후 누적 평단가": f"{avg_1:,.0f} 원"
-                },
-                {
-                    "분할 단계": "2차 매수",
-                    "지정 매수 단가": f"{target_p2:,.0f} 원",
-                    "차수별 집행 예산": f"{spent_2:,.0f} 원",
-                    "체결 수량": f"{q2:,} 주",
-                    "★ 체결 후 누적 평단가": f"{avg_2:,.0f} 원 (📉 하향)"
-                },
-                {
-                    "분할 단계": "3차 매수",
-                    "지정 매수 단가": f"{target_p3:,.0f} 원",
-                    "차수별 집행 예산": f"{spent_3:,.0f} 원",
-                    "체결 수량": f"{q3:,} 주",
-                    "★ 체결 후 누적 평단가": f"{avg_3:,.0f} 원 (📉 최후 완결)"
-                },
-            ])
-            st.dataframe(schedule_df, use_container_width=True, hide_index=True)
-
-            q_col1, q_col2, q_col3 = st.columns(3)
-            q_col1.info(f"**📉 3차 매수 완결 시 최종 평단가:**\n### {avg_3:,.0f} 원")
-            q_col2.success(f"**🎯 1차 권장 목표 익절가 (+15%):**\n### {calc_target_exit:,.0f} 원")
-            q_col3.error(f"**🚨 최종 기계적 손절가 (-5%):**\n### {calc_stop_loss:,.0f} 원")
             st.markdown("---")
 
         # 실시간 이슈 분석
@@ -525,3 +450,54 @@ if ticker_code:
         * **[거래량 분석]** {vol_desc}
         * **[RSI 수급 심리]** 현재 심리지표는 **RSI {rsi_display}** 수준으로, {"과매도(침체) 구간에 도달하여 기술적 반등 타점이 임박했습니다." if rsi_val < 35 else ("단기 과열권에 진입하여 부분 차익실현을 고려할 구간입니다." if rsi_val > 70 else "과열이나 침체 없이 안정적인 수급 흐름을 보여주고 있습니다.")}
         """)
+
+        st.markdown("---")
+
+        # 4대 분석 원칙 융합 5대 심층 리서치 프롬프트 자동 생성기 (탭 분리 완료)
+        st.markdown("### 🤖 수석 애널리스트 5대 심층 리서치 프롬프트 생성기")
+        st.caption("※ 회원님의 4대 분석 원칙이 자동 결합된 5가지 롤플레잉 프롬프트입니다. 원하는 탭을 선택하여 복사 후 사용하십시오.")
+
+        col_p1, col_p2, col_p3 = st.columns(3)
+        compare_name = col_p1.text_input("📊 비교 대상 종목", "SK하이닉스")
+        target_sector = col_p2.text_input("🌐 관심 섹터", "반도체/AI")
+        target_theme = col_p3.text_input("🚀 주도 테마", "SMR (소형모듈원전)")
+        
+        held_stock = st.text_input("💼 보유 포트폴리오 종목", "1Q S&P500")
+
+        # 4대 절대 원칙 자동 삽입 베이스
+        master_prompt = """너는 20년 경력의 글로벌 자산운용사 수석 주식 애널리스트야. 아래 4가지 원칙을 반드시 지켜서 답해줘.
+1. 거대 자금을 운용해 온 전문가답게 신뢰감 있고 권위 있는 말투를 사용할 것
+2. 최근 6개월 이내의 데이터와 오늘 기준의 실시간 정보를 바탕으로 분석할 것
+3. 차트 중심의 기술적 분석과 기업 가치 중심의 기본적 분석을 함께 고려할 것
+4. 장점뿐 아니라 리스크도 충분히 설명하고, 어려운 용어는 초보자도 이해할 수 있게 일상적인 비유로 풀어줄 것
+
+---"""
+
+        # 5가지 탭으로 완벽하게 분류
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "① 뉴스 정밀 해부", 
+            "② 가치투자 비교", 
+            "③ 미 증시 브리핑", 
+            "④ 수급/차트 추적", 
+            "⑤ 구조적 주도주"
+        ])
+
+        with tab1:
+            p1 = f"{master_prompt}\n\n너는 냉철한 주식 시장 분석가야. 방금 나온 '{search_name}'의 뉴스 [여기에 뉴스 제목/내용 요약 입력]을 분석해 줘. 이 뉴스가 단기 및 중장기적으로 주가에 긍정적인지 부정적인지 판단하고, 그 핵심 이유를 3가지로 명확히 요약해 줘. 마지막으로 이 뉴스를 해석할 때 개인 투자자가 흔히 범할 수 있는 오류나 주의해야 할 리스크도 함께 짚어줘."
+            st.code(p1, language="markdown")
+
+        with tab2:
+            p2 = f"{master_prompt}\n\n너는 가치투자 전문가야. '{search_name}'와(과) '{compare_name}'를 비교 분석하려고 해. 두 회사의 최근 분기 기준 실적 추이와 PER, PBR, ROE, 영업이익률 수치를 표로 깔끔하게 정리해서 비교해 줘. 이를 바탕으로 현재 시점에서 어떤 종목이 더 저평가되어 매력적인지, 수익성 측면에서는 누가 더 우위에 있는지 투자 초보자도 이해하기 쉽게 설명해줘."
+            st.code(p2, language="markdown")
+
+        with tab3:
+            p3 = f"{master_prompt}\n\n어제 미국 증시에서 '{target_sector}' 지수와 주요 ETF의 흐름이 어땠는지 요약해 줘. 특히 글로벌 대장주(예: 엔비디아, 테슬라 등)와 관련된 최신 핵심 뉴스 중에서, 오늘 한국 시장의 '{held_stock}' 주가 흐름에 직접적인 영향을 줄 만한 요인만 3문장 이내로 짧고 강렬하게 브리핑해 줘."
+            st.code(p3, language="markdown")
+
+        with tab4:
+            p4 = f"{master_prompt}\n\n너는 글로벌 헤지펀드의 데이터 분석가야. 최근 한 달간 '{search_name}'에 대한 외국인과 기관의 누적 수급 동향을 기반으로 이들의 매매 패턴을 분석해 줘. 최근 발생한 대량 거래량을 동반한 매수/매도 주체가 누구인지 파악하고, 이것이 단기 차익 실현 성격인지 장기적 관점의 비중 확대인지 너의 논리적인 추론을 제시해 줘. 또한 향후 주가조정 시 강력한 지지선 역할을 할 가격대도 예측해 줘."
+            st.code(p4, language="markdown")
+
+        with tab5:
+            p5 = f"{master_prompt}\n\n너는 20년 경력의 톱티어 자산운용사 수석 애널리스트야. 2026년 현재의 금리 기조와 환율, 그리고 '{target_theme}' 산업의 구조적 변화를 종합적으로 반영해서 분석 리포트를 작성해 줘. 향후 6개월에서 1년간 주식 시장의 상승을 주도할 가장 유망한 세부 업종 3가지를 선정하고, 각 업종 내에서 기술력과 시장 점유율을 독점하고 있는 확실한 대장주를 하나씩 추천해 줘. 추천 근거는 구체적인 데이터나 예상 시나리오를 바탕으로 작성해."
+            st.code(p5, language="markdown")
