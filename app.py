@@ -395,19 +395,47 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 주가 기술적 분석 차트
+        # ★ [수정 완료] 스마트 확장 및 고해상도 확대 호환 반응형 주가/거래량 차트
         st.markdown("### 📈 주가 기술적 분석 차트 (과거 4년 장기 추세 및 거래량)")
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.7, 0.3])
-        fig.add_trace(go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="주가"), row=1, col=1)
+        st.caption("🔍 **차트 확대 팁**: 차트 하단 레인지 슬라이더를 드래그하거나 손가락 핀치 줌으로 확대하시면 Y축 단가가 실시간 자동 스케일링되어 선명하게 표출됩니다.")
+
+        fig = make_subplots(
+            rows=2, cols=1, 
+            shared_xaxes=True, 
+            vertical_spacing=0.06, 
+            row_heights=[0.7, 0.3]
+        )
+        
+        # 캔들스틱 차트
+        fig.add_trace(go.Candlestick(
+            x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
+            name="주가", increasing_line_color='red', decreasing_line_color='blue'
+        ), row=1, col=1)
+        
+        # 이동평균선
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
+        
+        # 거래량 차트
         fig.add_trace(go.Bar(x=df['Date'], y=df['Volume'], name="거래량", marker_color='gray'), row=2, col=1)
         
-        fig.update_layout(xaxis_rangeslider_visible=True, height=580, margin=dict(t=10, b=10, l=10, r=10))
+        # 확대 시 축 찌그러짐 방지 및 Y축 자동 줌(Autoscale) 레이아웃 적용
+        fig.update_layout(
+            height=650,
+            margin=dict(t=20, b=20, l=10, r=10),
+            xaxis_rangeslider_visible=True,
+            hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        # 확대 시 Y축 가격이 자동 맞춤되도록 설정
+        fig.update_yaxes(autorange=True, fixedrange=False, row=1, col=1)
+        fig.update_yaxes(autorange=True, fixedrange=False, row=2, col=1)
+
         st.plotly_chart(fig, use_container_width=True)
 
-        # ★ [신규 추가] 차트 X 거래량(수급) 정밀 연계 분석 퀀트 엔진
+        # 차트 X 거래량(수급) 정밀 연계 분석 퀀트 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 × 거래량(수급 에너지) 정밀 연계 분석")
         
         ma20_val = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
