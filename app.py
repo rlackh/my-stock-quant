@@ -338,7 +338,7 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 퀀트 매수의 의견 점수 산출 상세 근거 정밀 출력
+        # 퀀트 매수의견 점수 산출 상세 근거 정밀 출력
         st.markdown("### ⚡ 수석 애널리스트 퀀트 매수의견 및 종합 시그널")
         score = 0
         reasons = []
@@ -396,52 +396,46 @@ if ticker_code:
 
         st.markdown("---")
 
-        # 1. 메인 캔들스틱 주가 차트
-        st.markdown("### 📈 1. 주가 기술적 분석 차트 (과거 4년 장기 추세 및 이평선 파동)")
-        fig_price = go.Figure()
+        # ★ [개편 완료] 통합형 단일 주가 X 거래량 동시 분석 차트
+        st.markdown("### 📈 주가 및 거래량 통합 기술적 분석 차트 (과거 4년 장기 추세)")
+        st.caption("🔍 **통합 차트 안내**: 상단 패널의 캔들스틱/이평선과 하단 패널의 수급 거래량이 하나의 스마트 패널로 완전히 단일화되어 작동합니다.")
+
+        fig_combined = make_subplots(
+            rows=2, cols=1, 
+            shared_xaxes=True, 
+            vertical_spacing=0.06, 
+            row_heights=[0.7, 0.3]
+        )
         
-        fig_price.add_trace(go.Candlestick(
+        # 1행: 주가 캔들스틱 및 이동평균선
+        fig_combined.add_trace(go.Candlestick(
             x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
             name="주가", increasing_line_color='red', decreasing_line_color='blue'
-        ))
-        fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"))
-        fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"))
-        fig_price.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"))
+        ), row=1, col=1)
+        fig_combined.add_trace(go.Scatter(x=df['Date'], y=df['MA20'], line=dict(color='orange', width=1.5), name="20일 단기선"), row=1, col=1)
+        fig_combined.add_trace(go.Scatter(x=df['Date'], y=df['MA60'], line=dict(color='blue', width=1.5), name="60일 수급선"), row=1, col=1)
+        fig_combined.add_trace(go.Scatter(x=df['Date'], y=df['MA120'], line=dict(color='purple', width=2.5, dash='solid'), name="120일 경기선"), row=1, col=1)
         
-        fig_price.update_layout(
-            height=480, margin=dict(t=10, b=10, l=10, r=10),
-            xaxis_rangeslider_visible=False, hovermode="x unified",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-        fig_price.update_yaxes(tickformat=",d", autorange=True, fixedrange=False)
-        st.plotly_chart(fig_price, use_container_width=True)
-
-        # ★ 2. 순수 거래량 단독 차트 (수정 완결)
-        st.markdown("### 📊 2. 수급 에너지 거래량 단독 차트 (과거 4년 거래량 파동 및 20일 이동평균)")
-        st.caption("🔍 **단독 거래량 지표**: 캔들 간섭 없이 오직 수급 에너지의 분출과 감소 파동만을 전용으로 분석하는 차트입니다.")
-
-        fig_vol = go.Figure()
-        
-        # 거래량 막대
-        fig_vol.add_trace(go.Bar(
+        # 2행: 일간 거래량 및 20일 거래량 이동평균선
+        fig_combined.add_trace(go.Bar(
             x=df['Date'], y=df['Volume'], name="일간 거래량", marker_color='gray',
             hovertemplate="일자: %{x}<br>거래량: %{y:,.0f}주<extra></extra>"
-        ))
-        
-        # 20일 거래량 이동평균선
-        fig_vol.add_trace(go.Scatter(
-            x=df['Date'], y=df['Vol_MA20'], line=dict(color='red', width=2), name="20일 거래량 평균선",
+        ), row=2, col=1)
+        fig_combined.add_trace(go.Scatter(
+            x=df['Date'], y=df['Vol_MA20'], line=dict(color='red', width=1.5), name="20일 거래량 평균선",
             hovertemplate="20일 평균 거래량: %{y:,.0f}주<extra></extra>"
-        ))
+        ), row=2, col=1)
 
-        fig_vol.update_layout(
-            height=320, margin=dict(t=10, b=10, l=10, r=10),
+        fig_combined.update_layout(
+            height=650, margin=dict(t=20, b=20, l=10, r=10),
             xaxis_rangeslider_visible=True, hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        # k/M 영문 단위 제거 및 쉼표(천단위) 지정
-        fig_vol.update_yaxes(tickformat=",d", autorange=True, fixedrange=False)
-        st.plotly_chart(fig_vol, use_container_width=True)
+        # Y축 포맷팅 (영문 k/M 약어 제거 및 쉼표 표기)
+        fig_combined.update_yaxes(tickformat=",d", autorange=True, fixedrange=False, row=1, col=1)
+        fig_combined.update_yaxes(tickformat=",d", autorange=True, fixedrange=False, row=2, col=1)
+
+        st.plotly_chart(fig_combined, use_container_width=True)
 
         # 차트 X 거래량(수급) 정밀 연계 분석 퀀트 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 × 거래량(수급 에너지) 정밀 연계 분석")
@@ -503,3 +497,54 @@ if ticker_code:
         * **[거래량 수급 에너지]** {vol_flow_desc} ({breakout_desc})
         * **[RSI 수급 심리]** 현재 심리지표는 **RSI {rsi_display}** 수준으로, {"과매도(침체) 구간에 도달하여 기술적 반등 타점이 임박했습니다." if rsi_val < 35 else ("단기 과열권에 진입하여 부분 차익실현을 고려할 구간입니다." if rsi_val > 70 else "과열이나 침체 없이 안정적인 수급 흐름을 보여주고 있습니다.")}
         """)
+
+        st.markdown("---")
+
+        # 4대 원칙 융합 5대 심층 리서치 프롬프트 자동 생성기 (탭 분리 완료)
+        st.markdown("### 🤖 수석 애널리스트 5대 심층 리서치 프롬프트 생성기")
+        st.caption("※ 회원님의 4대 분석 원칙이 자동 결합된 5가지 롤플레잉 프롬프트입니다. 원하는 탭을 선택하여 복사 후 사용하십시오.")
+
+        col_p1, col_p2, col_p3 = st.columns(3)
+        compare_name = col_p1.text_input("📊 비교 대상 종목", "SK하이닉스")
+        target_sector = col_p2.text_input("🌐 관심 섹터", "반도체/AI")
+        target_theme = col_p3.text_input("🚀 주도 테마", "SMR (소형모듈원전)")
+        
+        held_stock = st.text_input("💼 보유 포트폴리오 종목", "1Q S&P500")
+
+        # 4대 절대 원칙 자동 삽입 베이스
+        master_prompt = """너는 20년 경력의 글로벌 자산운용사 수석 주식 애널리스트야. 아래 4가지 원칙을 반드시 지켜서 답해줘.
+1. 거대 자금을 운용해 온 전문가답게 신뢰감 있고 권위 있는 말투를 사용할 것
+2. 최근 6개월 이내의 데이터와 오늘 기준의 실시간 정보를 바탕으로 분석할 것
+3. 차트 중심의 기술적 분석과 기업 가치 중심의 기본적 분석을 함께 고려할 것
+4. 장점뿐 아니라 리스크도 충분히 설명하고, 어려운 용어는 초보자도 이해할 수 있게 일상적인 비유로 풀어줄 것
+
+---"""
+
+        # 5가지 탭으로 완벽하게 분류
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "① 뉴스 정밀 해부", 
+            "② 가치투자 비교", 
+            "③ 미 증시 브리핑", 
+            "④ 수급/차트 추적", 
+            "⑤ 구조적 주도주"
+        ])
+
+        with tab1:
+            p1 = f"{master_prompt}\n\n너는 냉철한 주식 시장 분석가야. 방금 나온 '{search_name}'의 뉴스 [여기에 뉴스 제목/내용 요약 입력]을 분석해 줘. 이 뉴스가 단기 및 중장기적으로 주가에 긍정적인지 부정적인지 판단하고, 그 핵심 이유를 3가지로 명확히 요약해 줘. 마지막으로 이 뉴스를 해석할 때 개인 투자자가 흔히 범할 수 있는 오류나 주의해야 할 리스크도 함께 짚어줘."
+            st.code(p1, language="markdown")
+
+        with tab2:
+            p2 = f"{master_prompt}\n\n너는 가치투자 전문가야. '{search_name}'와(과) '{compare_name}'를 비교 분석하려고 해. 두 회사의 최근 분기 기준 실적 추이와 PER, PBR, ROE, 영업이익률 수치를 표로 깔끔하게 정리해서 비교해 줘. 이를 바탕으로 현재 시점에서 어떤 종목이 더 저평가되어 매력적인지, 수익성 측면에서는 누가 더 우위에 있는지 투자 초보자도 이해하기 쉽게 설명해줘."
+            st.code(p2, language="markdown")
+
+        with tab3:
+            p3 = f"{master_prompt}\n\n어제 미국 증시에서 '{target_sector}' 지수와 주요 ETF의 흐름이 어땠는지 요약해 줘. 특히 글로벌 대장주(예: 엔비디아, 테슬라 등)와 관련된 최신 핵심 뉴스 중에서, 오늘 한국 시장의 '{held_stock}' 주가 흐름에 직접적인 영향을 줄 만한 요인만 3문장 이내로 짧고 강렬하게 브리핑해 줘."
+            st.code(p3, language="markdown")
+
+        with tab4:
+            p4 = f"{master_prompt}\n\n너는 글로벌 헤지펀드의 데이터 분석가야. 최근 한 달간 '{search_name}'에 대한 외국인과 기관의 누적 수급 동향을 기반으로 이들의 매매 패턴을 분석해 줘. 최근 발생한 대량 거래량을 동반한 매수/매도 주체가 누구인지 파악하고, 이것이 단기 차익 실현 성격인지 장기적 관점의 비중 확대인지 너의 논리적인 추론을 제시해 줘. 또한 향후 주가조정 시 강력한 지지선 역할을 할 가격대도 예측해 줘."
+            st.code(p4, language="markdown")
+
+        with tab5:
+            p5 = f"{master_prompt}\n\n너는 20년 경력의 톱티어 자산운용사 수석 애널리스트야. 2026년 현재의 금리 기조와 환율, 그리고 '{target_theme}' 산업의 구조적 변화를 종합적으로 반영해서 분석 리포트를 작성해 줘. 향후 6개월에서 1년간 주식 시장의 상승을 주도할 가장 유망한 세부 업종 3가지를 선정하고, 각 업종 내에서 기술력과 시장 점유율을 독점하고 있는 확실한 대장주를 하나씩 추천해 줘. 추천 근거는 구체적인 데이터나 예상 시나리오를 바탕으로 작성해."
+            st.code(p5, language="markdown")
