@@ -12,34 +12,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 직관적이고 깔끔한 UI 스타일링
+# 2. 직관적이고 깔끔한 UI 스타일링 (상단 잔여 대시 완벽 제거)
 st.markdown("""
 <style>
+    /* 기본 여백 조정 및 상단 바 제거 */
     .block-container {
-        padding-top: 1rem;
+        padding-top: 1.5rem;
         padding-bottom: 2rem;
         max-width: 520px;
     }
-    .nav-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0px 15px 0px;
-    }
-    .menu-icon {
-        font-size: 24px;
-        color: #1a1a1a;
-        cursor: pointer;
-    }
+    
+    /* 메인 타이틀 */
     .main-hero-title {
         font-size: 24px;
         font-weight: 800;
         color: #111827;
         text-align: center;
-        margin-top: 10px;
+        margin-top: 5px;
         margin-bottom: 20px;
         letter-spacing: -0.5px;
     }
+    
+    /* 뉴스 카드 스타일 */
     .news-card {
         background-color: #f8fafc;
         border: 1px solid #e2e8f0;
@@ -65,6 +59,8 @@ st.markdown("""
         text-decoration: none;
         font-weight: 600;
     }
+    
+    /* 버튼 커스텀 */
     div.stButton > button {
         border-radius: 10px;
         border: 1px solid #e2e8f0;
@@ -163,8 +159,7 @@ if "analyzed_news" not in st.session_state:
 if "stock_name" not in st.session_state:
     st.session_state.stock_name = ""
 
-# --- 화면 렌더링 ---
-st.markdown('<div class="nav-bar"><div class="menu-icon">☰</div></div>', unsafe_allow_html=True)
+# --- 메인 화면 렌더링 ---
 st.markdown('<div class="main-hero-title">어떤 투자 판단을 도와드릴까요?</div>', unsafe_allow_html=True)
 
 # 종목명 입력창
@@ -175,18 +170,18 @@ target_stock = st.text_input(
     label_visibility="collapsed"
 )
 
-# 모드 선택 및 실행 버튼
+# 모드 선택 (가치투자 비교 제외) 및 실행 버튼
 col_sel, col_btn = st.columns([1.1, 1])
 with col_sel:
     selected_mode = st.selectbox(
         "분석 프레임워크 선택",
-        ["1. 뉴스 정밀 해부", "2. 가치투자 비교", "3. 미국 증시 브리핑", "4. 수급/차트 추적", "5. 구조적 주도주 3선"],
+        ["1. 뉴스 정밀 해부", "2. 미국 증시 브리핑", "3. 수급/차트 추적", "4. 구조적 주도주 3선"],
         label_visibility="collapsed"
     )
 with col_btn:
     btn_click = st.button("🚀 정밀 분석 실행", use_container_width=True)
 
-# 버튼 클릭 시 분석 로직 실행
+# 분석 실행 로직
 if btn_click:
     stock = target_stock.strip() if target_stock.strip() else "삼성전자"
     st.session_state.stock_name = stock
@@ -196,7 +191,7 @@ if btn_click:
     else:
         st.session_state.analyzed_news = None
 
-# 실시간 기사 목록 및 삼성증권 포함 증권사 애널리스트 종합 보고서 출력
+# 실시간 기사 목록 및 삼성증권 포함 증권사 종합 분석 리포트 출력
 if st.session_state.analyzed_news is not None:
     stock = st.session_state.stock_name
     news_items = st.session_state.analyzed_news
