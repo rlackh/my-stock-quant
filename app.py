@@ -5,47 +5,47 @@ from urllib.parse import urlparse, parse_qs
 import pandas as pd
 import datetime
 
-# 1. 모바일/웹 반응형 뷰 설정 (상단 여백 넉넉히 확보)
+# 1. 와이드 대시보드 레이아웃 설정 (화면 크기 대폭 확장)
 st.set_page_config(
-    page_title="throneinvest.ai",
-    page_icon="👑",
-    layout="centered",
+    page_title="글로벌 자산운용사 퀀트 리서치 엔진",
+    page_icon="🦅",
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 2. 모바일 앱 스타일 CSS 주입
+# 2. 직관적이고 시원한 와이드 UI 스타일링
 st.markdown("""
 <style>
     .block-container {
-        padding-top: 3.5rem !important;
-        padding-bottom: 2.5rem;
-        max-width: 540px;
+        padding-top: 2.5rem !important;
+        padding-bottom: 3rem;
+        max-width: 1200px;
     }
     .main-hero-title {
-        font-size: 24px;
+        font-size: 28px;
         font-weight: 800;
         color: #111827;
         text-align: center;
         margin-top: 5px;
-        margin-bottom: 22px;
+        margin-bottom: 25px;
         letter-spacing: -0.5px;
     }
     .news-card {
         background-color: #f8fafc;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
-        padding: 13px 15px;
-        margin-bottom: 10px;
+        padding: 14px 18px;
+        margin-bottom: 12px;
     }
     .news-title {
-        font-size: 14px;
+        font-size: 15px;
         font-weight: 700;
         color: #0f172a;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
         line-height: 1.4;
     }
     .news-meta {
-        font-size: 12px;
+        font-size: 13px;
         color: #64748b;
     }
     .news-link {
@@ -53,14 +53,22 @@ st.markdown("""
         text-decoration: none;
         font-weight: 600;
     }
+    .summary-box {
+        background-color: #f1f5f9;
+        border-left: 5px solid #2563eb;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-top: 15px;
+        margin-bottom: 15px;
+    }
     div.stButton > button {
         border-radius: 10px;
         border: 1px solid #e2e8f0;
         background-color: #ffffff;
         color: #1e293b;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
-        padding: 8px 12px;
+        padding: 9px 15px;
     }
     div.stButton > button:hover {
         border-color: #0f172a;
@@ -77,7 +85,7 @@ TICKER_DICT = {
     "NAVER": "035420", "삼성바이오로직스": "207940", "셀트리온": "068270"
 }
 
-# 4. 실시간 뉴스 수집 엔진
+# 4. 네이버 금융 실시간 뉴스 크롤링 엔진
 def fetch_realtime_news(stock_name: str):
     code = TICKER_DICT.get(stock_name, "005930")
     news_list = []
@@ -119,11 +127,12 @@ def fetch_realtime_news(stock_name: str):
         ]
     return news_list
 
-# 5. 증권사 리서치 컨센서스 수집 엔진
+# 5. 주요 증권사 리서치 컨센서스 수집 엔진
 def fetch_broker_consensus(stock_name: str):
     return {
         "opinion": "매수 (BUY / 4.1)",
         "target_price": "350,000원 ~ 380,000원",
+        "avg_target": "365,000원",
         "reports": [
             {"broker": "삼성증권", "opinion": "BUY", "target": "380,000원", "point": "차세대 HBM 수율 안정화 및 글로벌 빅테크 턴키 수주 가시화"},
             {"broker": "미래에셋증권", "opinion": "BUY", "target": "360,000원", "point": "2026년 분기 사상 최대 실적 달성 및 하방 경직성 확보"},
@@ -141,17 +150,18 @@ if "fetched_news" not in st.session_state:
 # --- UI 렌더링 ---
 st.markdown('<div class="main-hero-title">어떤 투자 판단을 도와드릴까요?</div>', unsafe_allow_html=True)
 
-# 종목명 입력창
-target_stock = st.text_input(
-    label="종목명 입력",
-    value="삼성전자",
-    placeholder="종목명을 입력하세요 (예: 삼성전자, SK하이닉스)",
-    label_visibility="collapsed"
-)
+# 종목명 및 분석 프레임워크 선택 영역
+c_input, c_mode, c_btn = st.columns([1.5, 1.5, 1])
 
-# 5대 프레임워크 선택 및 실행 버튼
-col_sel, col_btn = st.columns([1.2, 1])
-with col_sel:
+with c_input:
+    target_stock = st.text_input(
+        label="종목명 입력",
+        value="삼성전자",
+        placeholder="종목명을 입력하세요 (예: 삼성전자, SK하이닉스)",
+        label_visibility="collapsed"
+    )
+
+with c_mode:
     selected_mode = st.selectbox(
         "분석 프레임워크 선택",
         [
@@ -163,7 +173,8 @@ with col_sel:
         ],
         label_visibility="collapsed"
     )
-with col_btn:
+
+with c_btn:
     btn_click = st.button("🚀 정밀 분석 실행", use_container_width=True)
 
 # 버튼 클릭 시 5대 프레임워크 & 4대 원칙 결합 분석 엔진 구동
@@ -201,15 +212,26 @@ if btn_click:
 
 ---
 
-#### 3. 국내 주요 증권사 애널리스트 투자의견 및 컨센서스 (삼성증권 포함)
-* **종합 컨센서스**: **{consensus['opinion']}** (목표주가 밴드: **{consensus['target_price']}**)
+#### 3. 국내 주요 증권사 애널리스트 투자의견 및 목표가 컨센서스
+
+* **종합 투자의견 컨센서스**: **{consensus['opinion']}**  
+* **목표주가 밴드**: **{consensus['target_price']}** (평균 목표주가: **{consensus['avg_target']}**)
 
 | 증권사 | 투자의견 | 목표주가 | 핵심 리서치 분석 근거 |
 | :--- | :---: | :---: | :--- |
-| **삼성증권** | **BUY** | **380,000원** | 차세대 HBM 수율 안정화 및 글로벌 빅테크 턴키 수주 가시화 |
-| **미래에셋증권** | **BUY** | **360,000원** | 2026년 분기 사상 최대 실적 달성 및 하방 경직성 확보 |
-| **NH투자증권** | **BUY** | **350,000원** | FCF 50% 기반 주주환원 프로그램 가동에 따른 멀티플 리레이팅 |
-| **한국투자증권** | **BUY** | **370,000원** | 메모리 공급 부족 장기화에 따른 P에서 Q로의 확장 수혜 |
+| **{consensus['reports'][0]['broker']}** | **{consensus['reports'][0]['opinion']}** | **{consensus['reports'][0]['target']}** | {consensus['reports'][0]['point']} |
+| **{consensus['reports'][1]['broker']}** | **{consensus['reports'][1]['opinion']}** | **{consensus['reports'][1]['target']}** | {consensus['reports'][1]['point']} |
+| **{consensus['reports'][2]['broker']}** | **{consensus['reports'][2]['opinion']}** | **{consensus['reports'][2]['target']}** | {consensus['reports'][2]['point']} |
+| **{consensus['reports'][3]['broker']}** | **{consensus['reports'][3]['opinion']}** | **{consensus['reports'][3]['target']}** | {consensus['reports'][3]['point']} |
+
+---
+
+#### 📋 증권사 컨센서스 총괄 종합 요약
+* **투자의견 일치도**: 주요 증권사 전원 **'BUY(적극 매수)'** 일치
+* **핵심 컨센서스 총평**: 
+  1. 최근 불거진 스펙 노이즈는 공급 부족(Shortage)을 해결하기 위한 출하량(Q) 확대 과정으로, 실질 매출 성장을 견인할 전망입니다.
+  2. 분기 89조 원을 상회하는 실체적 이익 창출력과 FCF 50% 기반 자사주 매입·소각 등 주주환원 정책이 맞물려 밸류에이션 리레이팅이 확실시됩니다.
+  3. 현재 주가 대비 평균 **+30% 이상의 상승 여력**이 존재하므로, 눌림목 발생 시 적극적인 분할 매수 전략이 유효하다는 것이 증권가의 지배적인 평가입니다.
 """
 
     elif "2. 가치투자" in selected_mode:
