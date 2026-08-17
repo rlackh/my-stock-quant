@@ -7,10 +7,12 @@ from plotly.subplots import make_subplots
 import datetime
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse, parse_qs
+
 # 1. 글로벌 헤지펀드 스펙 대시보드 환경 및 레이아웃 정의
 st.set_page_config(page_title="글로벌 자산운용사 퀀트 엔진", layout="wide")
 st.title("🦅 기관 투자자용 실시간 퀀트 및 수급 추적 시스템")
 st.markdown("---")
+
 # 2. 국내 주요 상장 종목 마스터 데이터
 KOREA_TICKERS = {
     "삼성전자": "005930", "SK하이닉스": "000660", "HD현대일렉트릭": "267260",
@@ -18,7 +20,9 @@ KOREA_TICKERS = {
     "두산에너빌리티": "034020", "한화에어로스페이스": "012450", "KB금융": "105560",
     "NAVER": "035420", "삼성바이오로직스": "207940", "셀트리온": "068270",
     "POSCO홀딩스": "005490", "LG에너지솔루션": "012200", "삼성SDI": "006400"
-}# 3. 과거 4년(1,000거래일) 주가 데이터 수집 엔진
+}
+
+# 3. 과거 주가 데이터 수집 엔진
 @st.cache_data(ttl=120)
 def get_korea_stock_data(code):
     try:
@@ -60,7 +64,8 @@ def get_korea_stock_data(code):
     except Exception:
         pass
     return pd.DataFrame()
-# 4. ROE 및 PER 핀셋 추출 엔진
+
+# 4. ROE 및 PER 추출 엔진
 def get_naver_financial_metrics(ticker_code):
     metrics = {"PER": "N/A", "ROE": "N/A"}
     try:
@@ -83,7 +88,8 @@ def get_naver_financial_metrics(ticker_code):
     except:
         pass
     return metrics
-# 5. PC/모바일 100% 호환 모바일 뉴스 파싱 엔진
+
+# 5. PC/모바일 호환 뉴스 파싱 엔진
 def get_classified_news(ticker_code, search_name=""):
     news_data = {"기회": [], "중립": [], "위기": []}
     try:
@@ -125,6 +131,7 @@ def get_classified_news(ticker_code, search_name=""):
     except:
         pass
     return news_data
+
 # 6. 유튜브 직행 엔진
 @st.cache_data(ttl=600)
 def get_it_sin_youtube_insights():
@@ -147,6 +154,7 @@ def get_it_sin_youtube_insights():
             {"제목": "[IT의신 이형수] HBM4 턴키 공정 및 커스텀 AI 반도체 수급 집중 분석", "링크": "https://www.youtube.com/watch?v=R9ZInN6xW58", "일자": "실시간"},
             {"제목": "파운드리 공정 전환에 따른 반도체 소부장 핵심 톱픽 종목 점검", "링크": "https://www.youtube.com/watch?v=Jm3X4XnKq08", "일자": "실시간"}
         ]
+
 # 7. 수급 랭킹 스캐닝 엔진
 @st.cache_data(ttl=300)
 def get_market_top_trades():
@@ -185,6 +193,7 @@ def get_market_top_trades():
         })
         
     return pd.DataFrame(b_list), pd.DataFrame(s_list)
+
 # 8. 사이드바 검색 및 내 보유 평단가 입력
 st.sidebar.header("🔍 국내 전 종목 검색 엔진")
 search_name = st.sidebar.text_input("한글 종목명을 정확히 입력하세요", "삼성전자").strip()
@@ -194,6 +203,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("💼 내 보유 평단가 정밀 진단")
 user_buy_price = st.sidebar.number_input("내 보유 평단가 (원)", value=70000, step=500)
 st.sidebar.info(f"📌 **현재 입력 평단가:** {user_buy_price:,.0f}원")
+
 # 메인 UI 렌더링
 if ticker_code:
     df = get_korea_stock_data(ticker_code)
@@ -217,6 +227,7 @@ if ticker_code:
         prev_price = float(prev_row['Close'])
         pct_change = ((current_price - prev_price) / prev_price) * 100 if prev_price > 0 else 0.0
         naver_metrics = get_naver_financial_metrics(ticker_code)
+        
         st.subheader(f"🏢 {search_name} ({ticker_code}) | 펀더멘탈 실시간 대시보드")
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("현재가", f"{current_price:,.0f} KRW", f"{pct_change:+.2f}%")
@@ -227,6 +238,7 @@ if ticker_code:
         rsi_display = f"{rsi_val:.1f}" if pd.notna(rsi_val) else "분석 중"
         m4.metric("RSI (14) 심리지표", rsi_display)
         st.markdown("---")
+        
         # 내 보유 주식 평단가 솔루션
         if user_buy_price > 0:
             st.markdown(f"### 🎯 수석 애널리스트의 [{search_name}] 보유 포트폴리오 맞춤 솔루션")
@@ -240,6 +252,7 @@ if ticker_code:
             
             p_col2.metric("1차 목표 익절가 (전고점)", f"{high60_v:,.0f} 원")
             p_col3.metric("손절/비중축소 기준가 (20일선)", f"{ma20_v:,.0f} 원")
+            
             if profit_rate >= 10.0:
                 st.success(f"🟢 **[수익 극대화 구간 | +{profit_rate:.2f}%]**: 현재 훌륭한 수익을 거두고 계십니다. 전고점({high60_v:,.0f}원) 부근 도달 시 30~50% 1차 차익실현을 권장합니다.")
             elif 0 <= profit_rate < 10.0:
@@ -249,6 +262,7 @@ if ticker_code:
             else:
                 st.error(f"🔴 **[위험 관리 구간 | {profit_rate:.2f}%]**: 평단가 대비 -10% 이상 손실 구간입니다. 정해둔 손절 라인을 기계적으로 준수하십시오.")
             st.markdown("---")
+            
         # 실시간 이슈 분석
         st.markdown(f"### 📰 {search_name} 실시간 이슈 분석")
         classified_news = get_classified_news(ticker_code, search_name)
@@ -278,6 +292,7 @@ if ticker_code:
                         if n.get('링크'): st.markdown(f"👉 [기사 원문 보기 (모바일 호환)]({n['링크']})")
             else: st.caption("표시할 위기 리스크 뉴스가 없습니다.")
         st.markdown("---")
+        
         # 유튜브 IT의신 브리핑
         st.markdown("### 📺 [유튜브 'IT의신' 이형수 대표] 반도체/IT 핵심 인사이트 및 종목 브리핑")
         yt_videos = get_it_sin_youtube_insights()
@@ -292,6 +307,7 @@ if ticker_code:
             st.info("**[탑픽 추천 1] SK하이닉스 (000660)**\n* 근거: HBM4 턴키 공정 독점력 및 AI 메모리 수급 집중 수혜")
             st.success("**[탑픽 추천 2] HD현대일렉트릭 (267260)**\n* 근거: AI 데이터센터 전력 인프라 쇼크에 따른 북미 수출 호조")
         st.markdown("---")
+        
         # 메이저 수급 랭킹
         st.markdown("### 🐋 글로벌 메이저 수급 랭킹 (코스피 시장 주도주 동적 스캐닝)")
         df_buy, df_sell = get_market_top_trades()
@@ -300,23 +316,27 @@ if ticker_code:
         st.markdown("#### 🔴 세력 차익 실현 '순매도(Sell)' 상위 1~5위 종목")
         st.dataframe(df_sell, use_container_width=True, hide_index=True)
         st.markdown("---")
-        # 퀀트 매수의견 점수 산출 상세 근거 정밀 출력
+        
+        # 퀀트 매수의견 점수 산출
         st.markdown("### ⚡ 수석 애널리스트 퀀트 매수의견 및 종합 시그널")
         score = 0
         reasons = []
         ma120 = float(last_row['MA120']) if pd.notna(last_row['MA120']) else 0
         ma20 = float(last_row['MA20']) if pd.notna(last_row['MA20']) else 0
         ma60 = float(last_row['MA60']) if pd.notna(last_row['MA60']) else 0
+        
         if ma120 > 0 and current_price > ma120:
             score += 25
             reasons.append({"항목": "① 120일 경기선(장기 추세)", "점수": "+25점", "근거": f"현재가({current_price:,.0f}원)가 120일선({ma120:,.0f}원) 위에 위치하여 중장기 우상향 추세입니다."})
         else:
             reasons.append({"항목": "① 120일 경기선(장기 추세)", "점수": "+0점", "근거": f"현재가({current_price:,.0f}원)가 120일선({ma120:,.0f}원) 아래에 위치하여 추세가 다소 보수적입니다."})
+            
         if ma60 > 0 and ma20 > ma60:
             score += 25
             reasons.append({"항목": "② 20일/60일선 골든크로스", "점수": "+25점", "근거": "단기 수급선(20일)이 중기선(60일) 위에 안착하여 상승 모멘텀이 유효합니다."})
         else:
             reasons.append({"항목": "② 20일/60일선 골든크로스", "점수": "+0점", "근거": "단기 수급선이 역배열 상태로 단기 차익 매물 압박이 존재합니다."})
+            
         if pd.notna(rsi_val):
             if rsi_val < 35:
                 score += 25
@@ -326,6 +346,7 @@ if ticker_code:
                 reasons.append({"항목": "③ RSI(14) 심리지표", "점수": "+15점", "근거": f"RSI가 {rsi_val:.1f}로 과열 없이 적정한 중립 흐름을 유지 중입니다."})
             else:
                 reasons.append({"항목": "③ RSI(14) 심리지표", "점수": "+0점", "근거": f"RSI가 {rsi_val:.1f}로 단기 과열권에 진입하여 조정 리스크가 있습니다."})
+                
         n_opp = len(classified_news["기회"])
         n_risk = len(classified_news["위기"])
         if n_opp > n_risk:
@@ -333,12 +354,15 @@ if ticker_code:
             reasons.append({"항목": "④ 실시간 뉴스 호재/악재 비중", "점수": "+25점", "근거": f"기회 뉴스가 {n_opp}건으로 위기 뉴스({n_risk}건)보다 우세하여 미디어 심리가 긍정적입니다."})
         else:
             reasons.append({"항목": "④ 실시간 뉴스 호재/악재 비중", "점수": "+0점", "근거": f"위기 리스크 뉴스가 우세하거나 확고한 호재 모멘텀이 부족합니다."})
+            
         if score >= 75: st.success(f"🟢 **적극 매수 (Strong Buy)** | 종합 스코어: **{score}점 / 100점**")
         elif score >= 40: st.warning(f"🟡 **보유/관망 (Hold)** | 종합 스코어: **{score}점 / 100점**")
         else: st.error(f"🔴 **매수 금지 (Avoid)** | 종합 스코어: **{score}점 / 100점**")
+        
         st.markdown("#### 💡 왜 이런 스코어가 나왔을까요? (점수 산출 정밀 분석)")
         df_reasons = pd.DataFrame(reasons)
         st.dataframe(df_reasons, use_container_width=True, hide_index=True)
+        
         st.markdown("##### 🎯 수석 애널리스트 트레이딩 전략")
         if ma20 > 0 and ma20 < current_price: buy_target = int(ma20)
         else: buy_target = int(current_price * 0.97)
@@ -348,7 +372,8 @@ if ticker_code:
         col_t1.info(f"**📉 1차 매수 타점:** {buy_target:,.0f}원 부근 (눌림목 안전 지지선)")
         col_t2.error(f"**🚨 손절가 (Stop-Loss):** {stop_loss:,.0f}원 이탈 시 (원금 보존 손절선)")
         st.markdown("---")
-        # 1. 메인 캔들스틱 주가 차트 (통합형 및 단독 거래량 영역 완전히 분리 제거 완료)
+        
+        # 주가 기술적 분석 차트
         st.markdown("### 📈 주가 기술적 분석 차트 (과거 4년 장기 추세 및 이평선 파동)")
         fig_price = go.Figure()
         
@@ -367,6 +392,7 @@ if ticker_code:
         )
         fig_price.update_yaxes(tickformat=",d", autorange=True, fixedrange=False)
         st.plotly_chart(fig_price, use_container_width=True)
+        
         # 차트 X 거래량(수급) 정밀 연계 분석 퀀트 엔진
         st.markdown("#### 🔍 수석 애널리스트 차트 × 거래량(수급 에너지) 정밀 연계 분석")
         
@@ -374,7 +400,6 @@ if ticker_code:
         ma60_val = float(last_row['MA60']) if pd.notna(last_row['MA60']) else 0
         ma120_val = float(last_row['MA120']) if pd.notna(last_row['MA120']) else 0
         
-        # 1. 이평선 파동 진단
         if current_price > ma20_val > ma60_val > ma120_val:
             trend_desc = "🟢 **정배열 상승 추세 (Strong Uptrend)**: 단기·중기·장기 이동평균선이 안정적인 정배열을 구축하여 강력한 우상향 모멘텀을 형성하고 있습니다."
         elif current_price < ma20_val < ma60_val < ma120_val:
@@ -383,7 +408,7 @@ if ticker_code:
             trend_desc = "🔵 **장기 우상향 박스권 (Consolidation above 120MA)**: 120일 경기선 상단에서 주가가 매물을 소화하며 하단 지지선을 탄탄히 다지는 에너지를 축적하고 있습니다."
         else:
             trend_desc = "🟡 **혼조세 및 반등 탐색 구간**: 이평선들이 수렴하며 단기 수급 방향성을 재탐색하는 국면입니다."
-        # 2. 거래량 다이내믹스 및 상승/하락일 거래량 수급 분석
+            
         recent_20 = df.tail(20).copy()
         recent_20['Price_Change'] = recent_20['Close'] - recent_20['Open']
         up_days = recent_20[recent_20['Price_Change'] > 0]
@@ -401,12 +426,13 @@ if ticker_code:
             vol_flow_desc = f"⚠ **차익 매물 출회(Distribution) 주의**: 최근 20일간 하락일 평균 거래량({avg_down_vol:,.0f}주)이 상승일({avg_up_vol:,.0f}주)보다 많아 단기 차익 실현 매물이 시장에 공급되고 있습니다."
         else:
             vol_flow_desc = "📊 **균형 잡힌 수급 공방**: 상승일과 하락일의 거래량 밸런스가 균등하여 팽팽한 수급 겨루기가 진행되고 있습니다."
-        # 3. 거래량 돌파 판독
+            
         last_vol = float(last_row['Volume'])
         if last_vol >= vol_20day * 1.5 and current_price > ma20_val:
             breakout_desc = f"⚡ **[거래량 분출 돌파]** 당일 거래량({last_vol:,.0f}주)이 20일 평균의 150% 이상 폭발하며 20일 이동평균선 상단을 강력하게 돌파했습니다. 수급이 실린 진성 신호입니다."
         else:
             breakout_desc = f"현 거래량({last_vol:,.0f}주)은 20일 평균 대비 **{vol_ratio:.0f}%** 수준으로 무난한 거래 흐름을 보이고 있습니다."
+            
         high_60 = df['High'].tail(60).max()
         low_60 = df['Low'].tail(60).min()
         
@@ -417,46 +443,9 @@ if ticker_code:
             st.success(f"**📉 1차 핵심 지지선 (20일 이동평균):**\n### {ma20_val:,.0f} 원")
         with c_col3:
             st.warning(f"**🛡 2차 콘크리트 바닥선 (60일 최저가):**\n### {low_60:,.0f} 원")
+            
         st.markdown(f"""
         * **[주가 파동 진단]** {trend_desc}
         * **[거래량 수급 에너지]** {vol_flow_desc} ({breakout_desc})
         * **[RSI 수급 심리]** 현재 심리지표는 **RSI {rsi_display}** 수준으로, {"과매도(침체) 구간에 도달하여 기술적 반등 타점이 임박했습니다." if rsi_val < 35 else ("단기 과열권에 진입하여 부분 차익실현을 고려할 구간입니다." if rsi_val > 70 else "과열이나 침체 없이 안정적인 수급 흐름을 보여주고 있습니다.")}
         """)
-        st.markdown("---")
-        # 4대 분석 원칙 융합 5대 심층 리서치 프롬프트 자동 생성기 (하단 탭 구현 보존)
-        st.markdown("### 🤖 수석 애널리스트 5대 심층 리서치 프롬프트 생성기")
-        st.caption("※ 회원님의 4대 분석 원칙이 자동 결합된 5가지 롤플레잉 프롬프트입니다. 원하는 탭을 선택하여 복사 후 사용하십시오.")
-        col_p1, col_p2, col_p3 = st.columns(3)
-        compare_name = col_p1.text_input("📊 비교 대상 종목", "SK하이닉스")
-        target_sector = col_p2.text_input("🌐 관심 섹터", "반도체/AI")
-        target_theme = col_p3.text_input("🚀 주도 테마", "SMR (소형모듈원전)")
-        
-        held_stock = st.text_input("💼 보유 포트폴리오 종목", "1Q S&P500")
-        master_prompt = """너는 20년 경력의 글로벌 자산운용사 수석 주식 애널리스트야. 아래 4가지 원칙을 반드시 지켜서 답해줘.
-1. 거대 자금을 운용해 온 전문가답게 신뢰감 있고 권위 있는 말투를 사용할 것
-2. 최근 6개월 이내의 데이터와 오늘 기준의 실시간 정보를 바탕으로 분석할 것
-3. 차트 중심의 기술적 분석과 기업 가치 중심의 기본적 분석을 함께 고려할 것
-4. 장점뿐 아니라 리스크도 충분히 설명하고, 어려운 용어는 초보자도 이해할 수 있게 일상적인 비유로 풀어줄 것
----"""
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "① 뉴스 정밀 해부", 
-            "② 가치투자 비교", 
-            "③ 미 증시 브리핑", 
-            "④ 수급/차트 추적", 
-            "⑤ 구조적 주도주"
-        ])
-        with tab1:
-            p1 = f"{master_prompt}\n\n너는 냉철한 주식 시장 분석가야. 방금 나온 '{search_name}'의 뉴스 [여기에 뉴스 제목/내용 요약 입력]을 분석해 줘. 이 뉴스가 단기 및 중장기적으로 주가에 긍정적인지 부정적인지 판단하고, 그 핵심 이유를 3가지로 명확히 요약해 줘. 마지막으로 이 뉴스를 해석할 때 개인 투자자가 흔히 범할 수 있는 오류나 주의해야 할 리스크도 함께 짚어줘."
-            st.code(p1, language="markdown")
-        with tab2:
-            p2 = f"{master_prompt}\n\n너는 가치투자 전문가야. '{search_name}'와(과) '{compare_name}'를 비교 분석하려고 해. 두 회사의 최근 분기 기준 실적 추이와 PER, PBR, ROE, 영업이익률 수치를 표로 깔끔하게 정리해서 비교해 줘. 이를 바탕으로 현재 시점에서 어떤 종목이 더 저평가되어 매력적인지, 수익성 측면에서는 누가 더 우위에 있는지 투자 초보자도 이해하기 쉽게 설명해줘."
-            st.code(p2, language="markdown")
-        with tab3:
-            p3 = f"{master_prompt}\n\n어제 미국 증시에서 '{target_sector}' 지수와 주요 ETF의 흐름이 어땠는지 요약해 줘. 특히 글로벌 대장주(예: 엔비디아, 테슬라 등)와 관련된 최신 핵심 뉴스 중에서, 오늘 한국 시장의 '{held_stock}' 주가 흐름에 직접적인 영향을 줄 만한 요인만 3문장 이내로 짧고 강렬하게 브리핑해 줘."
-            st.code(p3, language="markdown")
-        with tab4:
-            p4 = f"{master_prompt}\n\n너는 글로벌 헤지펀드의 데이터 분석가야. 최근 한 달간 '{search_name}'에 대한 외국인과 기관의 누적 수급 동향을 기반으로 이들의 매매 패턴을 분석해 줘. 최근 발생한 대량 거래량을 동반한 매수/매도 주체가 누구인지 파악하고, 이것이 단기 차익 실현 성격인지 장기적 관점의 비중 확대인지 너의 논리적인 추론을 제시해 줘. 또한 향후 주가조정 시 강력한 지지선 역할을 할 가격대도 예측해 줘."
-            st.code(p4, language="markdown")
-        with tab5:
-            p5 = f"{master_prompt}\n\n너는 20년 경력의 톱티어 자산운용사 수석 애널리스트야. 2026년 현재의 금리 기조와 환율, 그리고 '{target_theme}' 산업의 구조적 변화를 종합적으로 반영해서 분석 리포트를 작성해 줘. 향후 6개월에서 1년간 주식 시장의 상승을 주도할 가장 유망한 세부 업종 3가지를 선정하고, 각 업종 내에서 기술력과 시장 점유율을 독점하고 있는 확실한 대장주를 하나씩 추천해 줘. 추천 근거는 구체적인 데이터나 예상 시나리오를 바탕으로 작성해."
-            st.code(p5, language="markdown")
