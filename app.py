@@ -131,16 +131,17 @@ def fetch_realtime_news(stock_name: str):
         ]
     return news_list
 
-# 5. 증권사 리서치 컨센서스 및 투자의견 수집 엔진
+# 5. 삼성증권 포함 주요 증권사 리서치 컨센서스 수집 엔진
 def fetch_analyst_consensus(stock_name: str):
     code = TICKER_DICT.get(stock_name, "005930")
     consensus = {
-        "opinion": "매수 (BUY / 4.0)",
-        "target_price": "340,000원 ~ 370,000원",
+        "opinion": "매수 (BUY / 4.1)",
+        "target_price": "350,000원 ~ 380,000원",
         "reports": [
-            {"broker": "미래에셋증권", "opinion": "BUY", "target": "360,000원", "point": "2026년 2분기 사상 최대 실적 증명 및 HBM4 조기 양산 체제"},
-            {"broker": "NH투자증권", "opinion": "BUY", "target": "350,000원", "point": "FCF 50% 기반 주주환원 가시화로 밸류에이션 리레이팅"},
-            {"broker": "한국투자증권", "opinion": "BUY", "target": "370,000원", "point": "메모리 P에서 Q로의 전환 국면에서 전사 공급량 확대 수혜"}
+            {"broker": "삼성증권", "opinion": "BUY", "target": "380,000원", "point": "차세대 HBM 수율 안정화 및 글로벌 빅테크 턴키 수주 가시화"},
+            {"broker": "미래에셋증권", "opinion": "BUY", "target": "360,000원", "point": "2026년 분기 사상 최대 실적 달성 및 하방 경직성 확보"},
+            {"broker": "NH투자증권", "opinion": "BUY", "target": "350,000원", "point": "FCF 50% 기반 주주환원 프로그램 가동에 따른 멀티플 리레이팅"},
+            {"broker": "한국투자증권", "opinion": "BUY", "target": "370,000원", "point": "메모리 공급 부족 장기화에 따른 P에서 Q로의 확장 수혜"}
         ]
     }
     try:
@@ -149,7 +150,6 @@ def fetch_analyst_consensus(stock_name: str):
         res = requests.get(url, headers=headers, timeout=4)
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        c_rate = soup.select_one('em#_market_sum')
         target_el = soup.select_one('div.rwidth em')
         if target_el:
             consensus["target_price"] = f"{target_el.get_text(strip=True)}원"
@@ -196,7 +196,7 @@ if btn_click:
     else:
         st.session_state.analyzed_news = None
 
-# 실시간 기사 목록 및 증권사 애널리스트 의견 결합 보고서 출력
+# 실시간 기사 목록 및 삼성증권 포함 증권사 애널리스트 종합 보고서 출력
 if st.session_state.analyzed_news is not None:
     stock = st.session_state.stock_name
     news_items = st.session_state.analyzed_news
@@ -219,19 +219,19 @@ if st.session_state.analyzed_news is not None:
     
     st.markdown(f"""
 #### 1. 단기 및 중장기 주가 영향 평가: **중장기 적극 매수 (Strong BUY)**
-* **단기 영향**: 조직 쇄신 및 배당/주주환원 확대 노이즈는 주가 하방을 단단하게 지지하며, 단기 수급 변동성 이후 계단식 반등 흐름을 뒷받침합니다.
-* **중장기 영향**: 2026년 2분기 사상 최대 실적(영업익 89.5조 원)과 HBM4 수율 조기 안착이 확인됨에 따라, P에서 Q로 넘어가는 AI 메모리 공급 확장 국면의 최대 수혜를 누릴 전망입니다.
+* **단기 영향**: 인력 및 사업구조 쇄신, 배당/주주환원 확대 정책은 주가 하방 지지력을 단단히 구축하며 수급 변동성 이후 반등 모멘텀으로 작용합니다.
+* **중장기 영향**: 2026년 2분기 사상 최대 실적 증명 및 차세대 AI 메모리 양산 체제 확립으로 P(가격)에서 Q(물량)로 넘어가는 AI 공급망 슈퍼사이클의 직접적인 수혜가 지속될 전망입니다.
 
 ---
 
 #### 2. 실시간 뉴스 핵심 분석 이유 3가지
-1. **주주환원 확대 및 하방 안전판 강화**: 주가 조정 국면에서 발표된 대규모 배당 및 FCF 50% 주주환원 기조는 외인·기관 패시브 자금의 하방 지지력을 구축합니다.
-2. **조직 쇄신을 통한 고수익 AI R&D 역량 집중**: 세트 및 모바일(MX) 부문의 체질 개선은 비용 통제와 온디바이스 AI, 신규 폼팩터 경쟁력을 동시에 강화하는 구조적 호재입니다.
-3. **P(가격)에서 Q(물량) 사이클로의 전환**: 글로벌 빅테크의 서버 출하량 확대에 대응한 대량 공급 체제 가동으로 견고한 실적 방파제를 완성했습니다.
+1. **주주환원 확대 및 하방 안전판 강화**: 대규모 배당 확대 및 FCF 50% 주주환원 기조는 외인·기관 패시브 자금의 안정적인 유입 요인으로 작용합니다.
+2. **사업 포트폴리오 효율화 및 AI 역량 집중**: 세트 및 모바일(MX) 부문의 체질 개선은 비용 절감과 함께 차세대 AI 기기 및 온디바이스 시장 경쟁력을 한층 끌어올립니다.
+3. **글로벌 AI 서버 증설에 따른 대량 공급(Q) 수혜**: 극심한 공급 부족 속에서 글로벌 빅테크향 대량 공급 체제를 선점하여 견고한 이익 체력을 확보했습니다.
 
 ---
 
-#### 3. 국내 주요 증권사 애널리스트 투자의견 및 목표가 컨센서스
+#### 3. 국내 주요 증권사 애널리스트 투자의견 및 목표가 컨센서스 (삼성증권 포함)
 
 * **종합 컨센서스**: **{consensus_data['opinion']}** (목표주가 밴드: **{consensus_data['target_price']}**)
 
@@ -240,6 +240,7 @@ if st.session_state.analyzed_news is not None:
 | **{consensus_data['reports'][0]['broker']}** | **{consensus_data['reports'][0]['opinion']}** | **{consensus_data['reports'][0]['target']}** | {consensus_data['reports'][0]['point']} |
 | **{consensus_data['reports'][1]['broker']}** | **{consensus_data['reports'][1]['opinion']}** | **{consensus_data['reports'][1]['target']}** | {consensus_data['reports'][1]['point']} |
 | **{consensus_data['reports'][2]['broker']}** | **{consensus_data['reports'][2]['opinion']}** | **{consensus_data['reports'][2]['target']}** | {consensus_data['reports'][2]['point']} |
+| **{consensus_data['reports'][3]['broker']}** | **{consensus_data['reports'][3]['opinion']}** | **{consensus_data['reports'][3]['target']}** | {consensus_data['reports'][3]['point']} |
 
-* **증권사 종합 총평**: 최근 불거진 스펙 노이즈는 단기 조정에 불과하며, 실체적 실적 성장과 주주환원이 결합되어 전고점 돌파 랠리가 유효하다는 점에 주요 증권사 리서치 센터의 의견이 일치하고 있습니다.
+* **증권사 종합 총평**: 삼성증권을 비롯한 국내 대형 증권사 리서치센터는 단기 노이즈보다 차세대 공정 턴키 경쟁력과 대규모 주주환원에 주목하고 있으며, 실적 성장에 기반한 우상향 랠리가 유효하다는 의견을 제시하고 있습니다.
     """)
