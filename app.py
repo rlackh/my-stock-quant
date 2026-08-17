@@ -12,12 +12,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 직관적이고 깔끔한 UI 스타일링 (상단 잔여 대시 완벽 제거)
+# 2. 직관적이고 깔끔한 UI 스타일링 (상단 잘림 방지 여백 확보)
 st.markdown("""
 <style>
-    /* 기본 여백 조정 및 상단 바 제거 */
+    /* 상단 패딩을 3.5rem으로 늘려 제목 잘림 완전 해결 */
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 3.5rem !important;
         padding-bottom: 2rem;
         max-width: 520px;
     }
@@ -28,9 +28,10 @@ st.markdown("""
         font-weight: 800;
         color: #111827;
         text-align: center;
-        margin-top: 5px;
-        margin-bottom: 20px;
+        margin-top: 10px;
+        margin-bottom: 25px;
         letter-spacing: -0.5px;
+        line-height: 1.3;
     }
     
     /* 뉴스 카드 스타일 */
@@ -170,7 +171,7 @@ target_stock = st.text_input(
     label_visibility="collapsed"
 )
 
-# 모드 선택 (가치투자 비교 제외) 및 실행 버튼
+# 모드 선택 및 실행 버튼
 col_sel, col_btn = st.columns([1.1, 1])
 with col_sel:
     selected_mode = st.selectbox(
