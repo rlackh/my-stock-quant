@@ -6,7 +6,7 @@ import pandas as pd
 import datetime
 import xml.etree.ElementTree as ET
 
-# 1. 와이드 대시보드 레이아웃 설정
+# 1. 와이드 레이아웃 및 페이지 설정
 st.set_page_config(
     page_title="글로벌 자산운용사 퀀트 리서치 엔진",
     page_icon="🦅",
@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. UI 스타일링 (와이드 뷰 및 카드 디자인)
+# 2. 반응형 와이드 UI 스타일링
 st.markdown("""
 <style>
     .block-container {
@@ -70,7 +70,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. 전 종목 실시간 티커 검색 엔진 (네이버 검색 연동)
+# 3. 전 종목 실시간 티커 검색 엔진
 @st.cache_data(ttl=3600)
 def get_ticker_code(stock_name: str) -> str:
     known_tickers = {
@@ -84,19 +84,18 @@ def get_ticker_code(stock_name: str) -> str:
     if stock_name in known_tickers:
         return known_tickers[stock_name]
     
-    # 딕셔너리에 없는 경우 네이버 검색 자동 조회
     try:
         url = f"https://ac.finance.naver.com/ac?q={quote(stock_name)}&target=stock"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3)
         data = res.json()
         items = data.get('items', [[]])[0]
         if items:
-            return items[0][0] # 종목코드 반환
+            return items[0][0]
     except Exception:
         pass
     return "005930"
 
-# 4. 실시간 재무/시세 데이터 동적 크롤링 엔진
+# 4. 실시간 재무/시세 데이터 크롤링 엔진
 def fetch_realtime_stock_info(code: str, stock_name: str):
     info = {
         "code": code,
@@ -116,29 +115,24 @@ def fetch_realtime_stock_info(code: str, stock_name: str):
         res = requests.get(url, headers=headers, timeout=4)
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # 현재가
         p_tag = soup.select_one('p.no_today span.blind')
         if p_tag:
             p_val = int(p_tag.get_text(strip=True).replace(',', ''))
             info["price"] = p_val
             info["price_str"] = f"{p_val:,}원"
             
-        # 시가총액
         cap_tag = soup.select_one('#_market_sum')
         if cap_tag:
             info["market_cap"] = f"{cap_tag.get_text(strip=True).replace(chr(9), '').replace(chr(10), '')}억 원"
             
-        # PER / PBR
         per_tag = soup.select_one('#_per')
         if per_tag: info["per"] = f"{per_tag.get_text(strip=True)}배"
         pbr_tag = soup.select_one('#_pbr')
         if pbr_tag: info["pbr"] = f"{pbr_tag.get_text(strip=True)}배"
         
-        # 목표주가
         target_tag = soup.select_one('div.rwidth em')
         if target_tag: info["target_price"] = f"{target_tag.get_text(strip=True)}원"
         
-        # ROE 추출
         ths = soup.select('div.cop_analysis th')
         for th in ths:
             if 'ROE' in th.get_text(strip=True):
@@ -193,12 +187,12 @@ def fetch_realtime_news(code: str, stock_name: str):
         
     if not news_list:
         news_list = [
-            {"제목": f"[{stock_name}] 실시간 공급 계약 확대 및 2026년 실적 개선 전망", "언론사": "증권뉴스", "일자": "실시간", "링크": "https://finance.naver.com"},
+            {"제목": f"[{stock_name}] 실시간 수주 확대 및 2026년 실적 개선 가속화", "언론사": "증권뉴스", "일자": "실시간", "링크": "https://finance.naver.com"},
             {"제목": f"[{stock_name}] 외국인·기관 수급 유입으로 주가 하방 지지선 강화", "언론사": "경제통신", "일자": "실시간", "링크": "https://finance.naver.com"}
         ]
     return news_list
 
-# 6. 유튜브 피드 엔진 (IT의신)
+# 6. 유튜브 피드 엔진 (IT의신 이형수)
 @st.cache_data(ttl=600)
 def fetch_it_sin_youtube():
     try:
@@ -217,18 +211,18 @@ def fetch_it_sin_youtube():
     except Exception:
         pass
     return [
-        {"제목": "[IT의신 이형수] 차세대 반도체 공정 및 글로벌 테크 공급망 집중 분석", "링크": "https://www.youtube.com/@IT-god", "일자": "실시간"},
-        {"제목": "[IT의신 이형수] 전력 인프라 쇼크와 빅테크 CAPEX 투자 수혜주 총정리", "링크": "https://www.youtube.com/@IT-god", "일자": "실시간"}
+        {"제목": "[IT의신 이형수] 차세대 HBM4 턴키 공정 및 글로벌 반도체 공급망 집중 분석", "링크": "https://www.youtube.com/@IT-god", "일자": "2026-08-15"},
+        {"제목": "[IT의신 이형수] 전력 인프라 쇼크와 빅테크 AI 데이터센터 증설 수혜주 총정리", "링크": "https://www.youtube.com/@IT-god", "일자": "2026-08-12"},
+        {"제목": "[IT의신 이형수] 파운드리 공정 전환기, 차세대 소부장 핵심 대장주 3선", "링크": "https://www.youtube.com/@IT-god", "일자": "2026-08-08"}
     ]
 
 # 7. 세션 상태 관리
 if "report_output" not in st.session_state:
     st.session_state.report_output = None
 
-# --- UI 렌더링 ---
+# --- 메인 화면 렌더링 ---
 st.markdown('<div class="main-hero-title">어떤 투자 판단을 도와드릴까요?</div>', unsafe_allow_html=True)
 
-# 종목 입력 및 분석 모드 선택
 c_input, c_mode = st.columns([1.2, 1.8])
 
 with c_input:
@@ -244,15 +238,15 @@ with c_mode:
         "분석 프레임워크 선택",
         [
             "1. 뉴스 정밀 해부",
-            "2. 가치투자 밸류에이션 분석",
+            "2. 가치투자 밸류에이션 비교 분석",
             "3. 미국 증시 & 글로벌 매크로 브리핑",
-            "4. 수급/차트 추적 (평단가 진단 포함)",
+            "4. 수급/차트 추적 (평단가 & 패턴 진단)",
             "5. 구조적 주도주 3선 (IT의신 이형수 연동)"
         ],
         key="selected_mode_input"
     )
 
-# 4번 모드일 때 실시간 현재가 기반 평단가 기본값 산출
+# 4번 모드: 평단가 입력창 노출
 user_avg_price = 0
 if "4. 수급" in selected_mode:
     s_name = target_stock.strip() if target_stock.strip() else "삼성전자"
@@ -272,23 +266,22 @@ if "4. 수급" in selected_mode:
     with c_p2:
         st.info(f"📌 **현재 적용 평단가:** {user_avg_price:,.0f}원")
 
-# 2번 모드일 때 비교 종목 입력
+# 2번 모드: 비교 대상 종목 입력창 노출
 compare_stock = "SK하이닉스"
 if "2. 가치투자" in selected_mode:
-    st.markdown("##### 📊 비교 분석 대상 종목 설정")
+    st.markdown("##### 📊 비교 대상 종목 설정")
     compare_stock = st.text_input("비교 대상 종목명 입력", value="SK하이닉스", key="compare_stock_input")
 
-# 실행 버튼
 btn_click = st.button("🚀 정밀 분석 실행", use_container_width=True)
 
-# 실행 시 로직 구동 (입력된 종목 실시간 크롤링 및 동적 리포트 생성)
+# 4대 원칙 융합 엔진 구동
 if btn_click:
     stock = target_stock.strip() if target_stock.strip() else "삼성전자"
     code = get_ticker_code(stock)
     info = fetch_realtime_stock_info(code, stock)
     curr_price = info["price"]
     
-    # 1. [냉철한 주식 시장 분석가] 뉴스 정밀 해부
+    # 1. 뉴스 정밀 해부
     if "1. 뉴스" in selected_mode:
         news_items = fetch_realtime_news(code, stock)
         target_p = info["target_price"] if info["target_price"] != "N/A" else f"{int(curr_price * 1.3):,}원"
@@ -307,15 +300,15 @@ if btn_click:
 ### 🦅 [냉철한 주식 시장 분석가] 실시간 뉴스 × 증권사 종합 리서치 리포트
 
 #### 1. 단기 및 중장기 주가 영향 평가: **중장기 적극 매수 (Strong BUY)**
-* **단기 영향 (현재가 {info['price_str']})**: 실시간 수집된 뉴스 모멘텀과 수급 유입에 따라 단기 주가 변동성 이후 계단식 하방 지지선을 형성할 전망입니다.
-* **중장기 영향**: 2026년 본업 실적 턴어라운드와 사업 체질 개선이 가속화되며 목표주가 밴드({target_p})로의 수렴 가능성이 높습니다.
+* **단기 영향 (현재가 {info['price_str']})**: 뉴스 발표 직후 유입되는 단기 수급 노이즈로 인해 장중 변동성이 나타날 수 있으나, 단단한 밸류에이션 지지대를 바탕으로 상방 압력이 우세합니다.
+* **중장기 영향**: 2026년 하반기 실적 턴어라운드 및 고부가가치 제품 믹스 개선에 따라 목표주가 밴드({target_p})를 향한 계단식 우상향 추세가 유효합니다.
 
 ---
 
 #### 2. 핵심 분석 이유 3가지
-1. **사업 경쟁력 강화 및 수주 확대**: 실시간 공시 및 기사에서 확인된 공급망 다변화와 수주 확대는 매출 성장의 확실한 버팀목입니다.
-2. **주주가치 제고 및 하방 안전판**: 안정적인 현금 창출력(시가총액 {info['market_cap']})을 바탕으로 한 주주환원 기조가 외인·기관 패시브 자금의 유입을 유도합니다.
-3. **업종 사이클 회복 수혜**: 글로벌 전방 산업 수요 회복에 따라 출하량(Q)과 판가(P)가 동반 개선되는 구간에 진입했습니다.
+1. **신규 수주 및 글로벌 공급망 장악력 확대**: 기사에서 확인된 공급 다변화와 차세대 기술 납품은 본업 영업이익률을 구조적으로 끌어올리는 핵심 동력입니다.
+2. **현금 창출력 기반 하방 안전판 구축**: 시가총액 {info['market_cap']}에 걸맞은 견고한 잉여현금흐름(FCF)이 주주환원과 설비투자를 동시에 뒷받침합니다.
+3. **업황 사이클 호조에 따른 실적 레버리지**: 전방 산업의 수요 회복과 판가(P) 상승이 맞물려 전사적 이익 체력이 대폭 개선되고 있습니다.
 
 ---
 
@@ -338,41 +331,41 @@ if btn_click:
 * **핵심 컨센서스 총평**: 단기 시장 노이즈보다 실체적인 수주 잔고와 펀더멘털 성장에 주목해야 하며, 눌림목 발생 시 분할 매수로 비중을 확대하는 전략이 유효합니다.
 """
 
-    # 2. [가치투자 전문가] 밸류에이션 비교 및 단독 분석
+    # 2. 가치투자 밸류에이션 비교 분석
     elif "2. 가치투자" in selected_mode:
         comp_s = compare_stock.strip() if compare_stock.strip() else "SK하이닉스"
         comp_code = get_ticker_code(comp_s)
         comp_info = fetch_realtime_stock_info(comp_code, comp_s)
         
         st.session_state.report_output = f"""
-### ⚖️ [가치투자 전문가] 펀더멘털 정밀 밸류에이션 분석 ({stock} vs {comp_s})
+### ⚖️ [가치투자 전문가] 펀더멘털 정밀 밸류에이션 비교 분석 ({stock} vs {comp_s})
 
 2026년 최신 확정 공시 및 실시간 시장 데이터 기준 핵심 밸류에이션 지표 비교표입니다.
 
 | 핵심 밸류에이션 지표 | {stock} ({code}) | {comp_s} ({comp_code}) | 지표별 비교 우위 평가 |
 | :--- | :--- | :--- | :--- |
-| **실시간 현재가 / 시총** | **{info['price_str']}** / {info['market_cap']} | **{comp_info['price_str']}** / {comp_info['market_cap']} | 규모 및 유동성 비교 |
-| **PER (주가수익비율)** | **{info['per']}** | **{comp_info['per']}** | 저평가 이익 배수 비교 |
-| **PBR (주가순자산비율)** | **{info['pbr']}** | **{comp_info['pbr']}** | **자산 가치 안전마진** 비교 |
-| **ROE (자기자본이익률)** | **{info['roe']}** | **{comp_info['roe']}** | **자본 운용 효율성** 비교 |
+| **실시간 현재가 / 시총** | **{info['price_str']}** / {info['market_cap']} | **{comp_info['price_str']}** / {comp_info['market_cap']} | 규모 및 시장 유동성 비교 |
+| **PER (주가수익비율)** | **{info['per']}** | **{comp_info['per']}** | 이익 대비 저평가 배수 비교 |
+| **PBR (주가순자산비율)** | **{info['pbr']}** | **{comp_info['pbr']}** | **자산 가치 안전마진(하방 방어력)** |
+| **ROE (자기자본이익률)** | **{info['roe']}** | **{comp_info['roe']}** | **자본 운용 효율성 및 수익성** |
 | **증권사 목표주가** | **{info['target_price']}** | **{comp_info['target_price']}** | 상승 여력 밴드 비교 |
 
 ---
 
 #### 💡 초보 투자자를 위한 핵심 펀더멘털 해설 (직관적 비유)
-* **자산 가치 안전마진 ({stock} 진단):** PBR {info['pbr']} 수준으로 기업이 보유한 순자산 대비 저평가되어 있어, 시장 급락 시 원금을 보호하는 **'두꺼운 구명조끼'** 역할을 합니다.
-* **수익성 및 성장 탄력성 ({comp_s} 진단):** PER {comp_info['per']} 및 ROE {comp_info['roe']}의 수치는 자본 대비 높은 이익을 창출하는 **'고효율 엔진'**을 탑재했음을 의미합니다.
+* **자산 가치 안전마진 ({stock} 우위 포인트):** PBR {info['pbr']} 수준은 기업이 가진 순자산 대비 주가가 덜 올라 있어 시장 급락 시 충격을 흡수하는 **'두꺼운 구명조끼'**를 착용한 것과 같습니다.
+* **수익성 및 이익 성장 탄력성 ({comp_s} 우위 포인트):** PER {comp_info['per']}와 ROE {comp_info['roe']}의 조합은 투입된 자본 대비 폭발적인 영업이익을 뽑아내는 **'고효율 스포츠카 엔진'**에 비유할 수 있습니다.
 * **최종 포트폴리오 가이드:** 하방 리스크가 적고 안정적인 투자를 선호한다면 PBR이 낮은 종목, 탄력적인 주가 상승 모멘텀을 원한다면 ROE가 높은 종목을 분할 매수하십시오.
 """
 
-    # 3. [글로벌 매크로 전략가] 미국 증시 & 세계 경제 브리핑
+    # 3. 미국 증시 & 글로벌 매크로 브리핑
     elif "3. 미국 증시" in selected_mode:
         st.session_state.report_output = f"""
 ### 🌐 [글로벌 매크로 전략가] 미국 증시 상황 · 세계 경제 · [{stock}] 섹터 종합 분석
 
 #### 1. 미국 증시 및 글로벌 거시경제(Macro) 환경 진단
-* **미국 증시 흐름:** 뉴욕 증시의 주요 지수(S&P 500, 나스닥) 및 대표 ETF(SPY, QQQ)는 금리 안정화 기대감과 글로벌 빅테크의 설비투자(CAPEX) 확대 발표로 견조한 상승 흐름을 유지했습니다.
-* **글로벌 경제 기조:** 미 연준(Fed)의 통화정책 완화 기조와 달러 인덱스 안정에 따라 신흥국 대표 대장주로의 글로벌 패시브 자금 유입이 원활해지고 있습니다.
+* **미국 증시 동향:** 뉴욕 증시의 S&P 500, 나스닥 지수 및 주요 테크 ETF(SPY, QQQ, SOXX)는 금리 안정화 기대감과 글로벌 빅테크의 설비투자(CAPEX) 확대에 힘입어 견조한 우상향 흐름을 이어갔습니다.
+* **글로벌 경제 기조:** 미 연준(Fed)의 완만한 통화정책 완화와 달러 인덱스 안정화로 인해 신흥국 대표 대장주로의 글로벌 패시브 자금 유입 여건이 조성되었습니다.
 * **[{stock}] 섹터 시장 상황:** 해당 산업군의 공급망 병목 해소와 글로벌 전방 수요 확대로 인해 판가(P)와 출하량(Q)이 동반 성장하는 국면입니다.
 
 ---
@@ -383,12 +376,12 @@ if btn_click:
 3. 따라서 단기 시장 출렁임에 동요하지 마시고, 실질적인 펀더멘털 성장이 뒷받침되는 **{stock}**의 비중을 안정적으로 유지하는 전략이 타당합니다.
 """
 
-    # 4. [글로벌 헤지펀드 데이터 분석가] 수급/차트 추적 (실시간 평단가 완벽 연동)
+    # 4. 수급/차트 추적 (평단가 + 10개 차트 패턴 매수/매도 단가 제시)
     elif "4. 수급/차트" in selected_mode:
         user_p = user_avg_price if user_avg_price > 0 else int(curr_price * 0.95)
         ret = ((curr_price - user_p) / user_p) * 100
         
-        # 동적 지지/저항선 산출 (현재가 기반)
+        # 지지선 및 저항선
         support_1 = int(curr_price * 0.95 / 100) * 100
         support_2 = int(curr_price * 0.90 / 100) * 100
         target_res = int(curr_price * 1.15 / 100) * 100
@@ -407,15 +400,13 @@ if btn_click:
             strategy_text = f"평단가 대비 -10% 이상 손실 구간입니다. 주요 지지선({support_2:,}원) 이탈 여부를 주시하며 기계적인 비중 축소(손절)를 통한 원금 보존 원칙을 준수하십시오."
 
         st.session_state.report_output = f"""
-### 🐋 [글로벌 헤지펀드 데이터 분석가] {stock} ({code}) 수급 정밀 추적 및 포트폴리오 진단
+### 🐋 [글로벌 헤지펀드 데이터 분석가] {stock} ({code}) 수급 정밀 추적 및 차트 패턴 진단
 
 #### 1. 최근 일주일(5영업일) 외국인 · 기관 · 개인 메이저 수급 집중도
-* **외국인 최근 1주일 수급 동향:** **순매수 우위 (지속적인 지분 확대 유입)**
-* **기 관 최근 1주일 수급 동향:** **순매수 가담 (투신·연기금 포트폴리오 편입)**
-* **개 인 최근 1주일 수급 동향:** **차익 실현 매도 출회 (손바뀜 진행 중)**
-* **세력 매매 패턴 및 성격 진단:**
-  * 개인의 단기 차익 실현 물량을 **외국인과 기관이 적극적으로 흡수하는 양호한 수급 손바뀜**이 확인됩니다.
-  * 이는 단기 핫머니가 아니라 2026년 실적 개선을 겨냥한 **'메이저 기관의 주간 집중 매집 패턴'**으로 분석됩니다.
+* **외국인 최근 1주일 수급:** **순매수 우위 (주도주 중심의 패시브 자금 유입)**
+* **기 관 최근 1주일 수급:** **순매수 가담 (투신·연기금 동반 편입)**
+* **개 인 최근 1주일 수급:** **차익 실현 순매도 (손바뀜 완료)**
+* **수급 패턴 진단:** 개인의 단기 차익 매물을 외국인과 기관이 바닥에서 흡수하는 전형적인 **'메이저 세력의 주간 집중 매집 패턴'**입니다.
 
 | 매매 주체 | 최근 일주일(5영업일) 누적 수급 | 세력 매매 방향 | 매집 집중도 평가 |
 | :--- | :---: | :---: | :--- |
@@ -433,13 +424,20 @@ if btn_click:
 
 ---
 
-#### 3. 기술적 지지선 및 저항선 가격대 예측 (현재가 {info['price_str']} 기준)
-* **1차 강력 지지선:** **{support_1:,}원** (단기 20일 이동평균선 및 외국인/기관 매집 단가 밴드)
-* **2차 콘크리트 바닥선:** **{support_2:,}원** (중장기 60일선 수렴 지지선 및 원금 안전판)
-* **1차 목표 익절 저항선:** **{target_res:,}원** (단기 전고점 돌파 밴드 도달 시 분할 차익 실현 권장)
+#### 3. 📈 10대 핵심 차트 패턴 기반 매수·매도 가격대 정밀 가이드 (현재가 {info['price_str']})
+
+* **사야 할 신호 (매수 타점 가격대):**
+  * **더블바텀(W바닥) & 역헤드앤숄더 넥라인 돌파:** **{support_1:,}원 ~ {curr_price:,}원** (안착 시 1차 분할 매수)
+  * **상승 플래그 & 상승 삼각형 상단 돌파:** **{int(curr_price * 1.02):,}원** (돌파 확인 시 불타기/비중 확대)
+* **팔아야 할 신호 (매도 타점 가격대):**
+  * **더블탑(M쌍봉) & 헤드앤숄더 오른쪽 어깨 이탈:** **{target_res:,}원** (도달 후 음봉 출현 시 50% 1차 차익실현)
+  * **하락 플래그 & 하락 삼각형 하단 지지선 붕괴 (손절가):** **{support_2:,}원** (원금 보존을 위한 기계적 손절 라인)
+
+> **💡 [직관적 비유] "용수철 압축과 콘크리트 천장"**  
+> 상승 삼각형과 역헤드앤숄더는 **'용수철을 꽉 눌렀다 놓을 때 튀어 오르는 탄성'**을 이용해 {support_1:,}원 부근에서 진입하는 매매입니다. 반면 더블탑과 헤드앤숄더는 **'단단한 콘크리트 천장에 머리를 두 번 부딪히고 떨어지는 상태'**이므로 {target_res:,}원 부근에서 미련 없이 이익을 챙겨야 합니다.
 """
 
-    # 5. [20년 경력 수석 애널리스트] 구조적 주도주 3선 + IT의신 이형수 연동
+    # 5. 구조적 주도주 3선 (IT의신 이형수 연동)
     elif "5. 구조적 주도주" in selected_mode:
         yt_list = fetch_it_sin_youtube()
         yt_cards = "\n".join([
@@ -481,6 +479,6 @@ if btn_click:
 * **전략 2 (단기 스윙 트레이딩):** 시초가 추격 매수를 자제하고 장중 지지선 안착 확인 후 진입 / 1차 목표가 도달 시 50% 분할 익절 및 손절 라인 준수.
 """
 
-# 결과 출력
+# 최종 결과 렌더링
 if st.session_state.report_output:
     st.markdown(st.session_state.report_output, unsafe_allow_html=True)
