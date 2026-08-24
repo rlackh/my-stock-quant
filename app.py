@@ -231,7 +231,6 @@ def fetch_realtime_stock_info(code: str, stock_name: str):
         "target_price_list": []
     }
     try:
-        # 네이버 금융 메인 크롤링
         url = f"https://finance.naver.com/item/main.naver?code={code}"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         res = requests.get(url, headers=headers, timeout=4)
@@ -266,7 +265,7 @@ def fetch_realtime_stock_info(code: str, stock_name: str):
                     if valid: info["roe"] = f"{valid[-1]}%"
                 break
                 
-        # 증권사별 목표주가 상세 크롤링 (네이버 금융 컨센서스/투자의견 페이지)
+        # 증권사별 목표주가 상세 크롤링
         c_url = f"https://finance.naver.com/item/coinfo.naver?code={code}&target=invest_opinion"
         c_res = requests.get(c_url, headers=headers, timeout=3)
         c_soup = BeautifulSoup(c_res.text, 'html.parser')
@@ -290,7 +289,7 @@ def fetch_realtime_stock_info(code: str, stock_name: str):
         info["price"] = 70000
         info["price_str"] = "70,000원"
         
-    # 목표주가가 N/A이거나 수집되지 않은 경우 밸류에이션 기반 증권사별 목표가 생성
+    # 목표주가가 미수집된 경우 밸류에이션 기반 증권사별 컨센서스 생성
     if info["target_price"] == "N/A" or not info["target_price_list"]:
         base_p = info["price"]
         s_price = f"{int(base_p * 1.35 / 1000) * 1000:,}원"
@@ -446,7 +445,7 @@ compare_stock = "SK하이닉스"
 if "2. 가치투자" in selected_mode:
     compare_stock = st.text_input("비교 대상 종목명", value="SK하이닉스", key="compare_stock_wts")
 
-# 실시간 시세 박스 (각 증권사 목표주가 컨센서스 연동)
+# 실시간 시세 박스
 st.markdown(f"""
 <div class="ticker-box">
     <div class="stock-title-row">
@@ -464,7 +463,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 분석 로직 실행 (4대 원칙 융합 출력)
+# 분석 로직 실행
 if btn_click:
     if "1. 뉴스" in selected_mode:
         news_items = fetch_realtime_news(code, stock)
@@ -507,12 +506,6 @@ if btn_click:
 | 증권사 | 투자의견 | 목표주가 | 핵심 리서치 분석 근거 |
 | :--- | :---: | :---: | :--- |
 {target_table_rows}
-
----
-
-**4. 개인 투자자가 주의해야 할 리스크 & 직관적 비유**
-> **💡 [비유 해설] "체질 개선을 위한 다이어트와 근육 트레이닝"**  
-> 단기 인력 재편이나 사업부 조정 뉴스를 보고 회사가 위기라며 패닉 셀(투매)에 동참하는 것은 오판입니다. 불필요한 지방을 빼고(비용 절감), 고수익 사업이라는 튼튼한 근육을 키우는 **체질 개선 과정**이므로 단기 헤드라인에 흔들려 뇌동매매하지 마십시오.
 """
 
     elif "2. 가치투자" in selected_mode:
@@ -532,13 +525,6 @@ if btn_click:
 | **PBR (주가순자산비율)** | **{info['pbr']}** | **{comp_info['pbr']}** | **자산 가치 안전마진(하방 방어력)** |
 | **ROE (자기자본이익률)** | **{info['roe']}** | **{comp_info['roe']}** | **자본 운용 효율성 및 수익성** |
 | **증권사 목표주가** | **{info['target_price']}** | **{comp_info['target_price']}** | 상승 여력 밴드 비교 |
-
----
-
-**초보 투자자를 위한 핵심 펀더멘털 해설 (직관적 비유)**
-* **자산 가치 안전마진 ({stock} 우위 포인트):** PBR {info['pbr']} 수준은 기업의 순자산 대비 주가 밸류에이션 부담이 적어 시장 급락 시 충격을 흡수하는 **'두꺼운 구명조끼'** 역할을 합니다.
-* **수익성 및 성장 탄력성 ({comp_s} 우위 포인트):** PER {comp_info['per']} 및 ROE {comp_info['roe']}의 수치는 투입 자본 대비 높은 이익을 창출하는 **'고효율 엔진'**을 의미합니다.
-* **최종 포트폴리오 가이드:** 하방 리스크가 적고 안정적인 투자를 선호한다면 PBR이 낮은 종목, 탄력적인 주가 상승 모멘텀을 원한다면 ROE가 높은 종목을 분할 매수하십시오.
 """
 
     elif "3. 미국 증시" in selected_mode:
@@ -609,9 +595,6 @@ if btn_click:
 * **팔아야 할 신호 (매도 타점 가격대):**
   * **더블탑(M쌍봉) & 헤드앤숄더 오른쪽 어깨 이탈:** **{target_res:,}원** (도달 후 음봉 출현 시 50% 1차 차익실현)
   * **하락 플래그 & 하락 삼각형 하단 지지선 붕괴 (손절가):** **{support_2:,}원** (기계적 손절 라인)
-
-> **💡 [직관적 비유] "용수철 압축과 콘크리트 천장"**  
-> 상승 삼각형과 역헤드앤숄더는 **'용수철을 꽉 눌렀다 놓을 때 튀어 오르는 탄성'**을 이용해 {support_1:,}원 부근에서 진입하는 매매입니다. 반면 더블탑과 헤드앤숄더는 **'단단한 콘크리트 천장에 머리를 두 번 부딪히고 떨어지는 상태'**이므로 {target_res:,}원 부근에서 미련 없이 이익을 챙겨야 합니다.
 """
 
     elif "5. 구조적 주도주" in selected_mode:
