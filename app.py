@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 상단 여백 확보 및 다크 테마 커스텀 CSS (색상 충돌 완벽 해결)
+# 2. 상단 여백 확보 및 다크 테마 커스텀 CSS
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -289,7 +289,6 @@ def fetch_realtime_stock_info(code: str, stock_name: str):
         info["price"] = 70000
         info["price_str"] = "70,000원"
         
-    # 목표주가가 미수집된 경우 밸류에이션 기반 증권사별 컨센서스 생성
     if info["target_price"] == "N/A" or not info["target_price_list"]:
         base_p = info["price"]
         s_price = f"{int(base_p * 1.35 / 1000) * 1000:,}원"
@@ -416,9 +415,10 @@ code = get_ticker_code(stock)
 info = fetch_realtime_stock_info(code, stock)
 curr_price = info["price"]
 
-# 4번 모드: 평단가 상태 관리 및 입력창
-if "user_avg_price_wts" not in st.session_state:
-    st.session_state.user_avg_price_wts = int(curr_price * 0.95)
+# 4번 모드: 종목별 평단가 고유 상태 관리 및 입력창 (버그 픽스 핵심)
+input_key = f"avg_price_{code}"
+if input_key not in st.session_state:
+    st.session_state[input_key] = int(curr_price * 0.95)
 
 if "4. 수급" in selected_mode:
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
@@ -430,13 +430,13 @@ if "4. 수급" in selected_mode:
             max_value=10000000,
             step=500, 
             format="%d",
-            key="user_avg_price_wts"
+            key=input_key
         )
     with c_p2:
         st.markdown(f"""
         <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px;">
             <div style="font-size: 11px; color: #8b949e;">적용 평단가</div>
-            <div style="font-size: 15px; font-weight: 700; color: #58a6ff;">{st.session_state.user_avg_price_wts:,.0f}원</div>
+            <div style="font-size: 15px; font-weight: 700; color: #58a6ff;">{st.session_state[input_key]:,.0f}원</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -525,6 +525,13 @@ if btn_click:
 | **PBR (주가순자산비율)** | **{info['pbr']}** | **{comp_info['pbr']}** | **자산 가치 안전마진(하방 방어력)** |
 | **ROE (자기자본이익률)** | **{info['roe']}** | **{comp_info['roe']}** | **자본 운용 효율성 및 수익성** |
 | **증권사 목표주가** | **{info['target_price']}** | **{comp_info['target_price']}** | 상승 여력 밴드 비교 |
+
+---
+
+**초보 투자자를 위한 핵심 펀더멘털 해설 (직관적 비유)**
+* **자산 가치 안전마진 ({stock} 우위 포인트):** PBR {info['pbr']} 수준은 기업의 순자산 대비 주가 밸류에이션 부담이 적어 시장 급락 시 충격을 흡수하는 **'두꺼운 구명조끼'** 역할을 합니다.
+* **수익성 및 성장 탄력성 ({comp_s} 우위 포인트):** PER {comp_info['per']} 및 ROE {comp_info['roe']}의 수치는 투입 자본 대비 높은 이익을 창출하는 **'고효율 엔진'**을 의미합니다.
+* **최종 포트폴리오 가이드:** 하방 리스크가 적고 안정적인 투자를 선호한다면 PBR이 낮은 종목, 탄력적인 주가 상승 모멘텀을 원한다면 ROE가 높은 종목을 분할 매수하십시오.
 """
 
     elif "3. 미국 증시" in selected_mode:
@@ -545,7 +552,8 @@ if btn_click:
 """
 
     elif "4. 수급/차트" in selected_mode:
-        user_p = st.session_state.user_avg_price_wts
+        # 고유 세션 키에 저장된 유저의 실시간 입력 평단가 변수 할당
+        user_p = st.session_state[input_key]
         ret = ((curr_price - user_p) / user_p) * 100
         
         support_1 = int(curr_price * 0.95 / 100) * 100
@@ -560,7 +568,7 @@ if btn_click:
             strategy_text = f"안정적인 진입 평단가입니다. 1차 강력 지지선({support_1:,}원)을 바탕으로 목표가({target_res:,}원) 도달 시까지 보유 비중을 유지하십시오."
         elif -10.0 < ret < 0:
             status_badge = f"<span style='color: #d29922; font-weight: 700;'>단기 눌림목 구간 ({ret:.2f}%)</span>"
-            strategy_text = f"현재 평단가보다 소폭 아래이나 메이저 수급이 하방을 지지하고 있으므로 2차 지지선({support_2:,}원) 확인 후 분할 매수를 권장합니다."
+            strategy_text = f"현재 평단가보다 주가가 소폭 하락했으나 메이저 수급이 하방을 지지하고 있으므로 2차 지지선({support_2:,}원) 확인 후 분할 매수를 권장합니다."
         else:
             status_badge = f"<span style='color: #f85149; font-weight: 700;'>위험 관리 구간 ({ret:.2f}%)</span>"
             strategy_text = f"평단가 대비 -10% 이상 손실 구간입니다. 주요 지지선({support_2:,}원) 이탈 여부를 주시하며 기계적인 비중 축소 원칙을 준수하십시오."
@@ -595,6 +603,9 @@ if btn_click:
 * **팔아야 할 신호 (매도 타점 가격대):**
   * **더블탑(M쌍봉) & 헤드앤숄더 오른쪽 어깨 이탈:** **{target_res:,}원** (도달 후 음봉 출현 시 50% 1차 차익실현)
   * **하락 플래그 & 하락 삼각형 하단 지지선 붕괴 (손절가):** **{support_2:,}원** (기계적 손절 라인)
+
+> **💡 [직관적 비유] "용수철 압축과 콘크리트 천장"**  
+> 상승 삼각형과 역헤드앤숄더는 **'용수철을 꽉 눌렀다 놓을 때 튀어 오르는 탄성'**을 이용해 {support_1:,}원 부근에서 진입하는 매매입니다. 반면 더블탑과 헤드앤숄더는 **'단단한 콘크리트 천장에 머리를 두 번 부딪히고 떨어지는 상태'**이므로 {target_res:,}원 부근에서 미련 없이 이익을 챙겨야 합니다.
 """
 
     elif "5. 구조적 주도주" in selected_mode:
