@@ -14,32 +14,38 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 색상 충돌 제로 고대비 다크 테마 커스텀 CSS
+# 2. 상단 잘림 방지 및 고대비 다크 테마 커스텀 CSS
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     
-    /* 1. 기본 앱 전체 배경 및 텍스트 색상 통일 */
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    /* 1. 상단 잘림 방지 (안전 여백 확보) */
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+        height: 1.5rem !important;
+    }
+    
+    .block-container {
+        padding-top: 4.5rem !important;
+        padding-bottom: 3rem !important;
+        max-width: 1240px;
+    }
+    
+    /* 2. 전체 앱 배경 및 기본 폰트 색상 통일 */
+    .stApp, [data-testid="stAppViewContainer"] {
         background-color: #0e1117 !important;
         color: #e6edf3 !important;
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
     
-    .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 3rem !important;
-        max-width: 1240px;
-    }
-    
-    /* 2. 상단 헤더 */
+    /* 3. 상단 헤더 */
     .toss-header {
         border-bottom: 1px solid #21262d;
-        padding-bottom: 12px;
+        padding-bottom: 14px;
         margin-bottom: 20px;
     }
     .toss-title {
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 800;
         color: #ffffff;
         letter-spacing: -0.5px;
@@ -50,7 +56,7 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    /* 3. 인풋창, 드롭다운 박스 텍스트/배경 일치화 (글자 안보임 현상 해결) */
+    /* 4. 인풋창, 드롭다운 텍스트/배경 일치화 */
     .stTextInput input, .stNumberInput input {
         background-color: #161b22 !important;
         color: #ffffff !important;
@@ -80,7 +86,7 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* 4. 실행 버튼 */
+    /* 5. 실행 버튼 */
     div.stButton > button {
         background-color: #238636 !important;
         color: #ffffff !important;
@@ -95,7 +101,7 @@ st.markdown("""
         background-color: #2ea043 !important;
     }
 
-    /* 5. 실시간 시세 박스 */
+    /* 6. 실시간 시세 카드 */
     .ticker-box {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -124,7 +130,7 @@ st.markdown("""
         margin: 6px 0 14px 0;
     }
     
-    /* 6. 지표 그리드 */
+    /* 7. 지표 그리드 */
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -148,7 +154,7 @@ st.markdown("""
         color: #f0f6fc;
     }
 
-    /* 7. 뉴스 카드 */
+    /* 8. 뉴스 박스 */
     .news-box {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -407,7 +413,7 @@ compare_stock = "SK하이닉스"
 if "2. 가치투자" in selected_mode:
     compare_stock = st.text_input("비교 대상 종목명", value="SK하이닉스")
 
-# 실시간 시세 박스 (색상 완벽 보정)
+# 실시간 시세 박스
 st.markdown(f"""
 <div class="ticker-box">
     <div class="stock-title-row">
