@@ -14,12 +14,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 상단 잘림 방지 및 고대비 다크 테마 커스텀 CSS
+# 2. 상단 여백 확보 및 다크 테마 커스텀 CSS (색상 충돌 완벽 해결)
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     
-    /* 1. 상단 잘림 방지 (안전 여백 확보) */
     header[data-testid="stHeader"] {
         background-color: transparent !important;
         height: 1.5rem !important;
@@ -31,14 +30,12 @@ st.markdown("""
         max-width: 1240px;
     }
     
-    /* 2. 전체 앱 배경 및 기본 폰트 색상 통일 */
     .stApp, [data-testid="stAppViewContainer"] {
         background-color: #0e1117 !important;
         color: #e6edf3 !important;
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
     
-    /* 3. 상단 헤더 */
     .toss-header {
         border-bottom: 1px solid #21262d;
         padding-bottom: 14px;
@@ -56,7 +53,6 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    /* 4. 인풋창, 드롭다운 텍스트/배경 일치화 */
     .stTextInput input, .stNumberInput input {
         background-color: #161b22 !important;
         color: #ffffff !important;
@@ -86,7 +82,6 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* 5. 실행 버튼 */
     div.stButton > button {
         background-color: #238636 !important;
         color: #ffffff !important;
@@ -101,7 +96,6 @@ st.markdown("""
         background-color: #2ea043 !important;
     }
 
-    /* 6. 실시간 시세 카드 */
     .ticker-box {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -130,7 +124,6 @@ st.markdown("""
         margin: 6px 0 14px 0;
     }
     
-    /* 7. 지표 그리드 */
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -154,7 +147,6 @@ st.markdown("""
         color: #f0f6fc;
     }
 
-    /* 8. 뉴스 박스 */
     .news-box {
         background-color: #161b22;
         border: 1px solid #30363d;
@@ -355,7 +347,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 검색 바 & 컨트롤
 c_input, c_mode, c_btn = st.columns([1.2, 1.8, 0.8])
 
 with c_input:
@@ -363,7 +354,8 @@ with c_input:
         "종목 검색",
         value="삼성전자",
         placeholder="종목명 입력 (예: 삼성전자, 큐로셀)",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key="target_stock_wts"
     )
 
 with c_mode:
@@ -376,7 +368,8 @@ with c_mode:
             "4. 수급/차트 추적 (평단가 & 패턴 진단)",
             "5. 구조적 주도주 3선 (IT의신 이형수 연동)"
         ],
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key="selected_mode_wts"
     )
 
 with c_btn:
@@ -388,30 +381,34 @@ code = get_ticker_code(stock)
 info = fetch_realtime_stock_info(code, stock)
 curr_price = info["price"]
 
-# 4번 모드: 평단가 입력창
-user_avg_price = 0
+# 4번 모드: 평단가 상태 관리 및 입력창
+if "user_avg_price_wts" not in st.session_state:
+    st.session_state.user_avg_price_wts = int(curr_price * 0.95)
+
 if "4. 수급" in selected_mode:
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
     c_p1, c_p2 = st.columns([2, 1])
     with c_p1:
-        user_avg_price = st.number_input(
+        st.number_input(
             f"[{stock}] 내 보유 매수 평단가 (원)", 
-            value=int(curr_price * 0.95), 
+            min_value=1,
+            max_value=10000000,
             step=500, 
-            format="%d"
+            format="%d",
+            key="user_avg_price_wts"
         )
     with c_p2:
         st.markdown(f"""
         <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px;">
             <div style="font-size: 11px; color: #8b949e;">적용 평단가</div>
-            <div style="font-size: 15px; font-weight: 700; color: #58a6ff;">{user_avg_price:,.0f}원</div>
+            <div style="font-size: 15px; font-weight: 700; color: #58a6ff;">{st.session_state.user_avg_price_wts:,.0f}원</div>
         </div>
         """, unsafe_allow_html=True)
 
 # 2번 모드: 비교 대상 종목 입력
 compare_stock = "SK하이닉스"
 if "2. 가치투자" in selected_mode:
-    compare_stock = st.text_input("비교 대상 종목명", value="SK하이닉스")
+    compare_stock = st.text_input("비교 대상 종목명", value="SK하이닉스", key="compare_stock_wts")
 
 # 실시간 시세 박스
 st.markdown(f"""
@@ -431,7 +428,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 분석 로직 실행 (4대 원칙 융합 출력)
+# 분석 로직 실행 (평단가 세션 실시간 완벽 반영)
 if btn_click:
     if "1. 뉴스" in selected_mode:
         news_items = fetch_realtime_news(code, stock)
@@ -512,7 +509,7 @@ if btn_click:
 """
 
     elif "4. 수급/차트" in selected_mode:
-        user_p = user_avg_price if user_avg_price > 0 else int(curr_price * 0.95)
+        user_p = st.session_state.user_avg_price_wts
         ret = ((curr_price - user_p) / user_p) * 100
         
         support_1 = int(curr_price * 0.95 / 100) * 100
@@ -564,7 +561,7 @@ if btn_click:
   * **하락 플래그 & 하락 삼각형 하단 지지선 붕괴 (손절가):** **{support_2:,}원** (기계적 손절 라인)
 
 > **💡 [직관적 비유] "용수철 압축과 콘크리트 천장"**  
-> 상승 삼각형과 역헤드앤숄더는 **'용수철을 꽉 눌렀다 놓을 때 튀어 오르는 탄성'**을 이용해 {support_1:,}원 부근에서 진입하는 매매입니다. 반면 더블탑과 헤드앤숄더는 **'단단한 콘크리트 천장에 머리를 두 번 부딪히고 떨어지는 상태'**이므로 {target_res:,}원 부근에서 미련 없이 이익을 챙겨야 합니다.
+> 상승 삼각형과 역헤드앤숄더는 **'용수철을꽉 눌렀다 놓을 때 튀어 오르는 탄성'**을 이용해 {support_1:,}원 부근에서 진입하는 매매입니다. 반면 더블탑과 헤드앤숄더는 **'단단한 콘크리트 천장에 머리를 두 번 부딪히고 떨어지는 상태'**이므로 {target_res:,}원 부근에서 미련 없이 이익을 챙겨야 합니다.
 """
 
     elif "5. 구조적 주도주" in selected_mode:
