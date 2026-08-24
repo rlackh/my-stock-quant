@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 상단 여백 확보 및 다크 테마 커스텀 CSS
+# 2. 상단 여백 확보 및 다크 테마 커스텀 CSS (색상 충돌 완벽 해결)
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -369,9 +369,9 @@ def fetch_it_sin_youtube():
         {"제목": "[IT의신 이형수] 전력 인프라 쇼크와 빅테크 CAPEX 투자 수혜주 총정리", "링크": "https://www.youtube.com/@IT-god", "일자": "실시간"}
     ]
 
-# 7. 세션 상태 관리
-if "report_output" not in st.session_state:
-    st.session_state.report_output = None
+# 7. 세션 상태 관리 (분석 실행 여부 플래그)
+if "run_analysis" not in st.session_state:
+    st.session_state.run_analysis = False
 
 # --- UI 렌더링 ---
 st.markdown("""
@@ -407,7 +407,8 @@ with c_mode:
     )
 
 with c_btn:
-    btn_click = st.button("분석 실행", use_container_width=True)
+    if st.button("분석 실행", use_container_width=True):
+        st.session_state.run_analysis = True
 
 # 종목 정보 수집
 stock = target_stock.strip() if target_stock.strip() else "삼성전자"
@@ -415,7 +416,7 @@ code = get_ticker_code(stock)
 info = fetch_realtime_stock_info(code, stock)
 curr_price = info["price"]
 
-# 4번 모드: 종목별 평단가 고유 상태 관리 및 입력창 (버그 픽스 핵심)
+# 4번 모드: 평단가 상태 관리 및 입력창 (실시간 동적 렌더링 적용)
 input_key = f"avg_price_{code}"
 if input_key not in st.session_state:
     st.session_state[input_key] = int(curr_price * 0.95)
@@ -463,8 +464,8 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 분석 로직 실행
-if btn_click:
+# 분석 로직 실행 (실시간 동적 렌더링)
+if st.session_state.run_analysis:
     if "1. 뉴스" in selected_mode:
         news_items = fetch_realtime_news(code, stock)
         target_table_rows = "\n".join([
@@ -472,7 +473,7 @@ if btn_click:
             for t in info["target_price_list"]
         ])
         
-        st.session_state.report_output = f"""
+        st.markdown(f"""
 ### 📰 [{stock} ({code})] 실시간 수집 핵심 뉴스
 
 """ + "\n".join([
@@ -506,14 +507,14 @@ if btn_click:
 | 증권사 | 투자의견 | 목표주가 | 핵심 리서치 분석 근거 |
 | :--- | :---: | :---: | :--- |
 {target_table_rows}
-"""
+""", unsafe_allow_html=True)
 
     elif "2. 가치투자" in selected_mode:
         comp_s = compare_stock.strip() if compare_stock.strip() else "SK하이닉스"
         comp_code = get_ticker_code(comp_s)
         comp_info = fetch_realtime_stock_info(comp_code, comp_s)
         
-        st.session_state.report_output = f"""
+        st.markdown(f"""
 ### ⚖️ [가치투자 전문가] 펀더멘털 정밀 밸류에이션 분석 ({stock} vs {comp_s})
 
 2026년 최신 확정 공시 및 실시간 시장 데이터 기준 핵심 밸류에이션 지표 비교표입니다.
@@ -532,10 +533,10 @@ if btn_click:
 * **자산 가치 안전마진 ({stock} 우위 포인트):** PBR {info['pbr']} 수준은 기업의 순자산 대비 주가 밸류에이션 부담이 적어 시장 급락 시 충격을 흡수하는 **'두꺼운 구명조끼'** 역할을 합니다.
 * **수익성 및 성장 탄력성 ({comp_s} 우위 포인트):** PER {comp_info['per']} 및 ROE {comp_info['roe']}의 수치는 투입 자본 대비 높은 이익을 창출하는 **'고효율 엔진'**을 의미합니다.
 * **최종 포트폴리오 가이드:** 하방 리스크가 적고 안정적인 투자를 선호한다면 PBR이 낮은 종목, 탄력적인 주가 상승 모멘텀을 원한다면 ROE가 높은 종목을 분할 매수하십시오.
-"""
+""", unsafe_allow_html=True)
 
     elif "3. 미국 증시" in selected_mode:
-        st.session_state.report_output = f"""
+        st.markdown(f"""
 ### 🌐 [글로벌 매크로 전략가] 미국 증시 상황 · 세계 경제 · [{stock}] 섹터 종합 분석
 
 **1. 미국 증시 및 글로벌 거시경제(Macro) 환경 진단**
@@ -549,10 +550,10 @@ if btn_click:
 1. 글로벌 매크로 유동성 환경이 개선됨에 따라 국내 대형주 전반에 외국인 매수 우위 환경이 조성되고 있습니다.
 2. 뉴욕 증시 동종 섹터의 강세는 오늘 개장 직후 **{stock}**의 시초가 갭상승 및 하방 지지력에 직접적인 호재로 작용합니다.
 3. 따라서 단기 시장 출렁임에 동요하지 마시고, 실질적인 펀더멘털 성장이 뒷받침되는 **{stock}**의 비중을 안정적으로 유지하는 전략이 타당합니다.
-"""
+""", unsafe_allow_html=True)
 
     elif "4. 수급/차트" in selected_mode:
-        # 고유 세션 키에 저장된 유저의 실시간 입력 평단가 변수 할당
+        # st.session_state 값을 실시간으로 읽어와서 동적 계산 수행
         user_p = st.session_state[input_key]
         ret = ((curr_price - user_p) / user_p) * 100
         
@@ -573,7 +574,7 @@ if btn_click:
             status_badge = f"<span style='color: #f85149; font-weight: 700;'>위험 관리 구간 ({ret:.2f}%)</span>"
             strategy_text = f"평단가 대비 -10% 이상 손실 구간입니다. 주요 지지선({support_2:,}원) 이탈 여부를 주시하며 기계적인 비중 축소 원칙을 준수하십시오."
 
-        st.session_state.report_output = f"""
+        st.markdown(f"""
 ### 🐋 [글로벌 헤지펀드 데이터 분석가] {stock} ({code}) 수급 정밀 추적 및 포트폴리오 진단
 
 **1. 최근 일주일(5영업일) 외국인 · 기관 · 개인 메이저 수급 집중도**
@@ -606,7 +607,7 @@ if btn_click:
 
 > **💡 [직관적 비유] "용수철 압축과 콘크리트 천장"**  
 > 상승 삼각형과 역헤드앤숄더는 **'용수철을 꽉 눌렀다 놓을 때 튀어 오르는 탄성'**을 이용해 {support_1:,}원 부근에서 진입하는 매매입니다. 반면 더블탑과 헤드앤숄더는 **'단단한 콘크리트 천장에 머리를 두 번 부딪히고 떨어지는 상태'**이므로 {target_res:,}원 부근에서 미련 없이 이익을 챙겨야 합니다.
-"""
+""", unsafe_allow_html=True)
 
     elif "5. 구조적 주도주" in selected_mode:
         yt_list = fetch_it_sin_youtube()
@@ -616,7 +617,7 @@ if btn_click:
             for v in yt_list
         ])
         
-        st.session_state.report_output = f"""
+        st.markdown(f"""
 ### 📺 [IT의신 이형수 대표] 최신 반도체/AI/산업 인사이트 영상 연동
 
 {yt_cards}
@@ -645,8 +646,4 @@ if btn_click:
 **2대 실전 매매 전략 가이드**
 * **전략 1 (장기 가치투자 매집):** 현재가({info['price_str']}) 기준 1차 지지선 부근 눌림목 발생 시 적립식 분할 매수 / 중장기 목표가 도달 시까지 보유.
 * **전략 2 (단기 스윙 트레이딩):** 시초가 추격 매수를 자제하고 장중 지지선 안착 확인 후 진입 / 1차 목표가 도달 시 50% 분할 익절 및 손절 라인 준수.
-"""
-
-# 결과 출력
-if st.session_state.report_output:
-    st.markdown(st.session_state.report_output, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
