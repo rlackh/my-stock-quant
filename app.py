@@ -14,35 +14,32 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 고대비 다크 테마 커스텀 스타일링 (배경/글자 충돌 방지)
+# 2. 색상 충돌 제로 고대비 다크 테마 커스텀 CSS
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     
-    /* 전체 배경 및 기본 폰트 색상 강제 지정 */
-    .stApp {
-        background-color: #0d1117 !important;
-        color: #f0f6fc !important;
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    /* 1. 기본 앱 전체 배경 및 텍스트 색상 통일 */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0e1117 !important;
+        color: #e6edf3 !important;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
     
     .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 3rem;
+        padding-top: 1.5rem !important;
+        padding-bottom: 3rem !important;
         max-width: 1240px;
     }
     
-    /* 상단 헤더 */
+    /* 2. 상단 헤더 */
     .toss-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding-bottom: 16px;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid #21262d;
+        padding-bottom: 12px;
         margin-bottom: 20px;
     }
     .toss-title {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 800;
         color: #ffffff;
         letter-spacing: -0.5px;
@@ -52,8 +49,8 @@ st.markdown("""
         color: #8b949e;
         margin-top: 4px;
     }
-    
-    /* 입력 필드 및 드롭다운 배경/글자색 명확화 */
+
+    /* 3. 인풋창, 드롭다운 박스 텍스트/배경 일치화 (글자 안보임 현상 해결) */
     .stTextInput input, .stNumberInput input {
         background-color: #161b22 !important;
         color: #ffffff !important;
@@ -67,23 +64,23 @@ st.markdown("""
         border: 1px solid #30363d !important;
         border-radius: 8px !important;
     }
-    
+    div[data-baseweb="select"] * {
+        color: #ffffff !important;
+    }
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
         background-color: #161b22 !important;
-        color: #ffffff !important;
+        border: 1px solid #30363d !important;
     }
-    
     li[role="option"] {
-        color: #ffffff !important;
         background-color: #161b22 !important;
+        color: #ffffff !important;
     }
-    
     li[role="option"]:hover, li[aria-selected="true"] {
         background-color: #1f6feb !important;
         color: #ffffff !important;
     }
 
-    /* 실행 버튼 */
+    /* 4. 실행 버튼 */
     div.stButton > button {
         background-color: #238636 !important;
         color: #ffffff !important;
@@ -92,51 +89,55 @@ st.markdown("""
         font-size: 15px !important;
         font-weight: 700 !important;
         padding: 9px 16px !important;
+        box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3) !important;
     }
     div.stButton > button:hover {
         background-color: #2ea043 !important;
     }
-    
-    /* 시세 카드 */
-    .ticker-card {
+
+    /* 5. 실시간 시세 박스 */
+    .ticker-box {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 20px;
     }
-    .stock-badge-name {
+    .stock-title-row {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .stock-name-text {
         font-size: 22px;
         font-weight: 800;
         color: #ffffff;
     }
-    .stock-badge-code {
+    .stock-code-text {
         font-size: 13px;
         color: #8b949e;
-        margin-left: 8px;
     }
-    .stock-price-val {
+    .stock-price-text {
         font-size: 32px;
         font-weight: 800;
         color: #ff7b72;
-        margin-top: 6px;
+        margin: 6px 0 14px 0;
     }
     
-    /* 지표 그리드 */
-    .metric-container {
+    /* 6. 지표 그리드 */
+    .metric-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
         gap: 10px;
-        margin-top: 15px;
     }
-    .metric-item {
-        background-color: #0d1117;
-        border: 1px solid #30363d;
+    .metric-cell {
+        background-color: #0e1117;
+        border: 1px solid #21262d;
         border-radius: 8px;
         padding: 10px;
         text-align: center;
     }
-    .metric-label {
+    .metric-lbl {
         font-size: 11px;
         color: #8b949e;
         margin-bottom: 4px;
@@ -146,27 +147,26 @@ st.markdown("""
         font-weight: 700;
         color: #f0f6fc;
     }
-    
-    /* 뉴스 및 보고서 박스 */
-    .toss-card {
+
+    /* 7. 뉴스 카드 */
+    .news-box {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 10px;
         padding: 14px 18px;
         margin-bottom: 10px;
     }
-    .toss-news-title {
+    .news-title {
         font-size: 15px;
         font-weight: 700;
         color: #58a6ff;
         margin-bottom: 4px;
-        line-height: 1.4;
     }
-    .toss-news-meta {
+    .news-meta {
         font-size: 12px;
         color: #8b949e;
     }
-    .toss-link {
+    .news-link {
         color: #58a6ff;
         text-decoration: none;
         font-weight: 600;
@@ -344,10 +344,8 @@ if "report_output" not in st.session_state:
 # --- UI 렌더링 ---
 st.markdown("""
 <div class="toss-header">
-    <div>
-        <div class="toss-title">⚡ 토스증권 WTS 퀀트 리서치</div>
-        <div class="toss-sub">20년 경력 수석 애널리스트 4대 원칙 기반 실시간 AI 분석</div>
-    </div>
+    <div class="toss-title">⚡ 토스증권 WTS 퀀트 리서치</div>
+    <div class="toss-sub">20년 경력 수석 주식 애널리스트 4대 원칙 기반 실시간 AI 분석</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -358,7 +356,7 @@ with c_input:
     target_stock = st.text_input(
         "종목 검색",
         value="삼성전자",
-        placeholder="종목명을 입력하세요 (예: 삼성전자, 큐로셀)",
+        placeholder="종목명 입력 (예: 삼성전자, 큐로셀)",
         label_visibility="collapsed"
     )
 
@@ -409,25 +407,25 @@ compare_stock = "SK하이닉스"
 if "2. 가치투자" in selected_mode:
     compare_stock = st.text_input("비교 대상 종목명", value="SK하이닉스")
 
-# 실시간 시세 카드
+# 실시간 시세 박스 (색상 완벽 보정)
 st.markdown(f"""
-<div class="ticker-card">
-    <div style="display: flex; align-items: baseline;">
-        <span class="stock-badge-name">{stock}</span>
-        <span class="stock-badge-code">{code}</span>
+<div class="ticker-box">
+    <div class="stock-title-row">
+        <span class="stock-name-text">{stock}</span>
+        <span class="stock-code-text">{code}</span>
     </div>
-    <div class="stock-price-val">{info['price_str']}</div>
-    <div class="metric-container">
-        <div class="metric-item"><div class="metric-label">시가총액</div><div class="metric-val">{info['market_cap']}</div></div>
-        <div class="metric-item"><div class="metric-label">PER</div><div class="metric-val">{info['per']}</div></div>
-        <div class="metric-item"><div class="metric-label">PBR</div><div class="metric-val">{info['pbr']}</div></div>
-        <div class="metric-item"><div class="metric-label">ROE</div><div class="metric-val">{info['roe']}</div></div>
-        <div class="metric-item"><div class="metric-label">목표주가</div><div class="metric-val" style="color: #58a6ff;">{info['target_price']}</div></div>
+    <div class="stock-price-text">{info['price_str']}</div>
+    <div class="metric-grid">
+        <div class="metric-cell"><div class="metric-lbl">시가총액</div><div class="metric-val">{info['market_cap']}</div></div>
+        <div class="metric-cell"><div class="metric-lbl">PER</div><div class="metric-val">{info['per']}</div></div>
+        <div class="metric-cell"><div class="metric-lbl">PBR</div><div class="metric-val">{info['pbr']}</div></div>
+        <div class="metric-cell"><div class="metric-lbl">ROE</div><div class="metric-val">{info['roe']}</div></div>
+        <div class="metric-cell"><div class="metric-lbl">목표주가</div><div class="metric-val" style="color: #58a6ff;">{info['target_price']}</div></div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# 분석 로직 실행
+# 분석 로직 실행 (4대 원칙 융합 출력)
 if btn_click:
     if "1. 뉴스" in selected_mode:
         news_items = fetch_realtime_news(code, stock)
@@ -437,8 +435,8 @@ if btn_click:
 ### 📰 [{stock} ({code})] 실시간 수집 핵심 뉴스
 
 """ + "\n".join([
-            f"<div class='toss-card'><div class='toss-news-title'>{idx}. {n['제목']}</div>"
-            f"<div class='toss-news-meta'>📝 {n['언론사']} &nbsp;|&nbsp; 📅 {n['일자']} &nbsp;|&nbsp; <a href='{n['링크']}' target='_blank' class='toss-link'>기사 원문 보기 ↗</a></div></div>"
+            f"<div class='news-box'><div class='news-title'>{idx}. {n['제목']}</div>"
+            f"<div class='news-meta'>📝 {n['언론사']} &nbsp;|&nbsp; 📅 {n['일자']} &nbsp;|&nbsp; <a href='{n['링크']}' target='_blank' class='news-link'>기사 원문 보기 ↗</a></div></div>"
             for idx, n in enumerate(news_items, 1)
         ]) + f"""
 
@@ -459,17 +457,9 @@ if btn_click:
 
 ---
 
-**3. 국내 주요 증권사 애널리스트 투자의견 및 목표가 컨센서스**
-
-* **종합 투자의견 컨센서스**: **{info['consensus_opinion']}**  
-* **증권사 목표주가 컨센서스**: **{target_p}** (상승 여력: **+30% 이상**)
-
-| 증권사 | 투자의견 | 목표주가 | 핵심 리서치 분석 근거 |
-| :--- | :---: | :---: | :--- |
-| **삼성증권** | **BUY** | **{target_p}** | 2026년 사업 포트폴리오 다각화 및 실적 성장 가시성 확보 |
-| **미래에셋증권** | **BUY** | **{target_p}** | 동종 업계 대비 확고한 펀더멘털 및 하방 경직성 증명 |
-| **NH투자증권** | **BUY** | **{target_p}** | 잉여현금흐름 기반 주주환원 확대 및 멀티플 리레이팅 |
-| **한국투자증권** | **BUY** | **{target_p}** | 글로벌 수요 확장에 따른 실적 서프라이즈 모멘텀 유효 |
+**3. 개인 투자자가 주의해야 할 리스크 & 직관적 비유**
+> **💡 [비유 해설] "체질 개선을 위한 다이어트와 근육 트레이닝"**  
+> 단기 인력 재편이나 사업부 조정 뉴스를 보고 회사가 위기라며 패닉 셀(투매)에 동참하는 것은 오판입니다. 불필요한 지방을 빼고(비용 절감), 고수익 사업이라는 튼튼한 근육을 키우는 **체질 개선 과정**이므로 단기 헤드라인에 흔들려 뇌동매매하지 마십시오.
 """
 
     elif "2. 가치투자" in selected_mode:
@@ -574,8 +564,8 @@ if btn_click:
     elif "5. 구조적 주도주" in selected_mode:
         yt_list = fetch_it_sin_youtube()
         yt_cards = "\n".join([
-            f"<div class='toss-card'><div class='toss-news-title'>🎙 {v['제목']}</div>"
-            f"<div class='toss-news-meta'>📅 업데이트: {v['일자']} &nbsp;|&nbsp; <a href='{v['링크']}' target='_blank' class='toss-link'>유튜브 방송 시청 ↗</a></div></div>"
+            f"<div class='news-box'><div class='news-title'>🎙 {v['제목']}</div>"
+            f"<div class='news-meta'>📅 업데이트: {v['일자']} &nbsp;|&nbsp; <a href='{v['링크']}' target='_blank' class='news-link'>유튜브 방송 시청 ↗</a></div></div>"
             for v in yt_list
         ])
         
