@@ -14,15 +14,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 토스증권 WTS 다크 모던 UI 커스텀 스타일링
+# 2. 고대비 다크 테마 커스텀 스타일링 (배경/글자 충돌 방지)
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     
-    html, body, [class*="css"] {
+    /* 전체 배경 및 기본 폰트 색상 강제 지정 */
+    .stApp {
+        background-color: #0d1117 !important;
+        color: #f0f6fc !important;
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-        background-color: #101318;
-        color: #f2f4f6;
     }
     
     .block-container {
@@ -31,138 +32,144 @@ st.markdown("""
         max-width: 1240px;
     }
     
-    /* 헤더 스타일 */
+    /* 상단 헤더 */
     .toss-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #202632;
-        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #30363d;
+        margin-bottom: 20px;
     }
     .toss-title {
         font-size: 24px;
-        font-weight: 700;
+        font-weight: 800;
         color: #ffffff;
         letter-spacing: -0.5px;
     }
     .toss-sub {
         font-size: 13px;
-        color: #8b95a1;
+        color: #8b949e;
         margin-top: 4px;
     }
     
-    /* 실시간 시세 카드 */
+    /* 입력 필드 및 드롭다운 배경/글자색 명확화 */
+    .stTextInput input, .stNumberInput input {
+        background-color: #161b22 !important;
+        color: #ffffff !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
+    }
+    
+    div[data-baseweb="select"] > div {
+        background-color: #161b22 !important;
+        color: #ffffff !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
+    }
+    
+    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
+        background-color: #161b22 !important;
+        color: #ffffff !important;
+    }
+    
+    li[role="option"] {
+        color: #ffffff !important;
+        background-color: #161b22 !important;
+    }
+    
+    li[role="option"]:hover, li[aria-selected="true"] {
+        background-color: #1f6feb !important;
+        color: #ffffff !important;
+    }
+
+    /* 실행 버튼 */
+    div.stButton > button {
+        background-color: #238636 !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        padding: 9px 16px !important;
+    }
+    div.stButton > button:hover {
+        background-color: #2ea043 !important;
+    }
+    
+    /* 시세 카드 */
     .ticker-card {
-        background-color: #171c24;
-        border: 1px solid #222936;
-        border-radius: 16px;
-        padding: 20px 24px;
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
         margin-bottom: 20px;
     }
     .stock-badge-name {
         font-size: 22px;
-        font-weight: 700;
+        font-weight: 800;
         color: #ffffff;
     }
     .stock-badge-code {
         font-size: 13px;
-        color: #8b95a1;
+        color: #8b949e;
         margin-left: 8px;
     }
     .stock-price-val {
         font-size: 32px;
         font-weight: 800;
-        color: #f04452;
-        margin-top: 8px;
-    }
-    .stock-price-sub {
-        font-size: 14px;
-        color: #f04452;
-        font-weight: 600;
-    }
-    
-    /* 뉴스 & 리포트 카드 */
-    .toss-card {
-        background-color: #171c24;
-        border: 1px solid #222936;
-        border-radius: 14px;
-        padding: 18px 20px;
-        margin-bottom: 12px;
-        transition: all 0.2s ease;
-    }
-    .toss-card:hover {
-        border-color: #3182f6;
-        transform: translateY(-2px);
-    }
-    .toss-news-title {
-        font-size: 15px;
-        font-weight: 600;
-        color: #f2f4f6;
-        line-height: 1.5;
-        margin-bottom: 6px;
-    }
-    .toss-news-meta {
-        font-size: 12px;
-        color: #6b7684;
-    }
-    .toss-link {
-        color: #3182f6;
-        text-decoration: none;
-        font-weight: 600;
-    }
-    
-    /* 인풋 및 버튼 스타일 */
-    .stTextInput > div > div > input, .stNumberInput > div > div > input {
-        background-color: #171c24 !important;
-        border: 1px solid #2b3445 !important;
-        color: #ffffff !important;
-        border-radius: 10px !important;
-        font-size: 14px !important;
-    }
-    .stSelectbox > div > div {
-        background-color: #171c24 !important;
-        border: 1px solid #2b3445 !important;
-        color: #ffffff !important;
-        border-radius: 10px !important;
-    }
-    div.stButton > button {
-        background-color: #3182f6 !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 10px !important;
-        font-size: 15px !important;
-        font-weight: 700 !important;
-        padding: 10px 16px !important;
-        box-shadow: 0 4px 12px rgba(49, 130, 246, 0.25);
-    }
-    div.stButton > button:hover {
-        background-color: #1b64da !important;
+        color: #ff7b72;
+        margin-top: 6px;
     }
     
     /* 지표 그리드 */
     .metric-container {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 12px;
-        margin-top: 14px;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
     }
     .metric-item {
-        background-color: #101318;
-        border: 1px solid #202632;
-        border-radius: 10px;
-        padding: 12px;
+        background-color: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 10px;
         text-align: center;
     }
     .metric-label {
         font-size: 11px;
-        color: #8b95a1;
+        color: #8b949e;
         margin-bottom: 4px;
     }
     .metric-val {
         font-size: 14px;
         font-weight: 700;
-        color: #ffffff;
+        color: #f0f6fc;
+    }
+    
+    /* 뉴스 및 보고서 박스 */
+    .toss-card {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 10px;
+    }
+    .toss-news-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #58a6ff;
+        margin-bottom: 4px;
+        line-height: 1.4;
+    }
+    .toss-news-meta {
+        font-size: 12px;
+        color: #8b949e;
+    }
+    .toss-link {
+        color: #58a6ff;
+        text-decoration: none;
+        font-weight: 600;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -210,7 +217,7 @@ def get_ticker_code(stock_name: str) -> str:
         pass
     return s_map.get("삼성전자", "005930")
 
-# 4. 실시간 재무/시세 데이터 크롤링 엔진
+# 4. 실시간 재무 및 시세 수집 엔진
 def fetch_realtime_stock_info(code: str, stock_name: str):
     info = {
         "code": code,
@@ -371,13 +378,14 @@ with c_mode:
 with c_btn:
     btn_click = st.button("분석 실행", use_container_width=True)
 
-# 4번 모드: 평단가 입력창 노출
-user_avg_price = 0
+# 종목 정보 수집
 stock = target_stock.strip() if target_stock.strip() else "삼성전자"
 code = get_ticker_code(stock)
 info = fetch_realtime_stock_info(code, stock)
 curr_price = info["price"]
 
+# 4번 모드: 평단가 입력창
+user_avg_price = 0
 if "4. 수급" in selected_mode:
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
     c_p1, c_p2 = st.columns([2, 1])
@@ -390,9 +398,9 @@ if "4. 수급" in selected_mode:
         )
     with c_p2:
         st.markdown(f"""
-        <div style="background-color: #171c24; border: 1px solid #222936; border-radius: 10px; padding: 12px; margin-top: 2px;">
-            <div style="font-size: 11px; color: #8b95a1;">적용 평단가</div>
-            <div style="font-size: 15px; font-weight: 700; color: #3182f6;">{user_avg_price:,.0f}원</div>
+        <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 11px; color: #8b949e;">적용 평단가</div>
+            <div style="font-size: 15px; font-weight: 700; color: #58a6ff;">{user_avg_price:,.0f}원</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -414,14 +422,13 @@ st.markdown(f"""
         <div class="metric-item"><div class="metric-label">PER</div><div class="metric-val">{info['per']}</div></div>
         <div class="metric-item"><div class="metric-label">PBR</div><div class="metric-val">{info['pbr']}</div></div>
         <div class="metric-item"><div class="metric-label">ROE</div><div class="metric-val">{info['roe']}</div></div>
-        <div class="metric-item"><div class="metric-label">목표주가</div><div class="metric-val" style="color: #3182f6;">{info['target_price']}</div></div>
+        <div class="metric-item"><div class="metric-label">목표주가</div><div class="metric-val" style="color: #58a6ff;">{info['target_price']}</div></div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # 분석 로직 실행
 if btn_click:
-    # 1. 뉴스 정밀 해부
     if "1. 뉴스" in selected_mode:
         news_items = fetch_realtime_news(code, stock)
         target_p = info["target_price"] if info["target_price"] != "N/A" else f"{int(curr_price * 1.35):,}원"
@@ -465,7 +472,6 @@ if btn_click:
 | **한국투자증권** | **BUY** | **{target_p}** | 글로벌 수요 확장에 따른 실적 서프라이즈 모멘텀 유효 |
 """
 
-    # 2. 가치투자 밸류에이션 비교 분석
     elif "2. 가치투자" in selected_mode:
         comp_s = compare_stock.strip() if compare_stock.strip() else "SK하이닉스"
         comp_code = get_ticker_code(comp_s)
@@ -492,7 +498,6 @@ if btn_click:
 * **최종 포트폴리오 가이드:** 하방 리스크가 적고 안정적인 투자를 선호한다면 PBR이 낮은 종목, 탄력적인 주가 상승 모멘텀을 원한다면 ROE가 높은 종목을 분할 매수하십시오.
 """
 
-    # 3. 미국 증시 & 글로벌 매크로 브리핑
     elif "3. 미국 증시" in selected_mode:
         st.session_state.report_output = f"""
 ### 🌐 [글로벌 매크로 전략가] 미국 증시 상황 · 세계 경제 · [{stock}] 섹터 종합 분석
@@ -510,7 +515,6 @@ if btn_click:
 3. 따라서 단기 시장 출렁임에 동요하지 마시고, 실질적인 펀더멘털 성장이 뒷받침되는 **{stock}**의 비중을 안정적으로 유지하는 전략이 타당합니다.
 """
 
-    # 4. 수급/차트 추적
     elif "4. 수급/차트" in selected_mode:
         user_p = user_avg_price if user_avg_price > 0 else int(curr_price * 0.95)
         ret = ((curr_price - user_p) / user_p) * 100
@@ -520,16 +524,16 @@ if btn_click:
         target_res = int(curr_price * 1.15 / 100) * 100
         
         if ret >= 10.0:
-            status_badge = f"<span style='color: #2563eb; font-weight: 700;'>수익 극대화 구간 (+{ret:.2f}%)</span>"
+            status_badge = f"<span style='color: #58a6ff; font-weight: 700;'>수익 극대화 구간 (+{ret:.2f}%)</span>"
             strategy_text = f"현재 +{ret:.2f}%의 수익을 확보 중입니다. 1차 목표 저항선({target_res:,}원) 부근 도달 시 30~50% 분할 익절하여 수익을 확정하십시오."
         elif 0 <= ret < 10.0:
-            status_badge = f"<span style='color: #00d084; font-weight: 700;'>안정적 보유 구간 (+{ret:.2f}%)</span>"
+            status_badge = f"<span style='color: #3fb950; font-weight: 700;'>안정적 보유 구간 (+{ret:.2f}%)</span>"
             strategy_text = f"안정적인 진입 평단가입니다. 1차 강력 지지선({support_1:,}원)을 바탕으로 목표가({target_res:,}원) 도달 시까지 보유 비중을 유지하십시오."
         elif -10.0 < ret < 0:
-            status_badge = f"<span style='color: #ffaa00; font-weight: 700;'>단기 눌림목 구간 ({ret:.2f}%)</span>"
+            status_badge = f"<span style='color: #d29922; font-weight: 700;'>단기 눌림목 구간 ({ret:.2f}%)</span>"
             strategy_text = f"현재 평단가보다 소폭 아래이나 메이저 수급이 하방을 지지하고 있으므로 2차 지지선({support_2:,}원) 확인 후 분할 매수를 권장합니다."
         else:
-            status_badge = f"<span style='color: #f04452; font-weight: 700;'>위험 관리 구간 ({ret:.2f}%)</span>"
+            status_badge = f"<span style='color: #f85149; font-weight: 700;'>위험 관리 구간 ({ret:.2f}%)</span>"
             strategy_text = f"평단가 대비 -10% 이상 손실 구간입니다. 주요 지지선({support_2:,}원) 이탈 여부를 주시하며 기계적인 비중 축소 원칙을 준수하십시오."
 
         st.session_state.report_output = f"""
@@ -567,7 +571,6 @@ if btn_click:
 > 상승 삼각형과 역헤드앤숄더는 **'용수철을 꽉 눌렀다 놓을 때 튀어 오르는 탄성'**을 이용해 {support_1:,}원 부근에서 진입하는 매매입니다. 반면 더블탑과 헤드앤숄더는 **'단단한 콘크리트 천장에 머리를 두 번 부딪히고 떨어지는 상태'**이므로 {target_res:,}원 부근에서 미련 없이 이익을 챙겨야 합니다.
 """
 
-    # 5. 구조적 주도주 3선
     elif "5. 구조적 주도주" in selected_mode:
         yt_list = fetch_it_sin_youtube()
         yt_cards = "\n".join([
